@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
@@ -50,6 +53,21 @@ class MyApp extends StatelessWidget {
   }
 }
 
+class _SearchSuggestion {
+  final String label;
+  final LatLng location;
+  final double zoom;
+
+  _SearchSuggestion(this.label, this.location, {required this.zoom});
+}
+
+class _SearchLocationResult {
+  final LatLng center;
+  final double zoom;
+
+  _SearchLocationResult(this.center, this.zoom);
+}
+
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
 
@@ -64,6 +82,12 @@ class _MyHomePageState extends State<MyHomePage> {
   final MapController _mapController = MapController();
 
   LatLng? _currentLocation;
+  bool _hasFocusedOnLocation = false;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  bool _isSearchingLocation = false;
+  Timer? _searchDebounce;
+  List<_SearchSuggestion> _searchSuggestions = [];
 
   // Stream subscription to track location continuously
   StreamSubscription<Position>? _positionStreamSubscription;
@@ -194,6 +218,188 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  Future<_SearchLocationResult?> _geocodeLocation(String query) async {
+    if (query.trim().isEmpty) return null;
+    final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
+      'q': query.trim(),
+      'format': 'json',
+      'limit': '5',
+    });
+    final response = await http.get(uri, headers: {
+      'User-Agent': 'longboard_app/1.0',
+    });
+    if (response.statusCode != 200) return null;
+    final data = jsonDecode(response.body);
+    if (data is! List || data.isEmpty) return null;
+
+    final locations = <_SearchLocationResult>[];
+    for (final item in data) {
+      if (item is! Map<String, dynamic>) continue;
+      final lat = double.tryParse(item['lat']?.toString() ?? '');
+      final lon = double.tryParse(item['lon']?.toString() ?? '');
+      if (lat == null || lon == null) continue;
+
+      double zoom = 15.0;
+      if (item['boundingbox'] is List && (item['boundingbox'] as List).length == 4) {
+        final bbox = item['boundingbox'] as List;
+        final south = double.tryParse(bbox[0]?.toString() ?? '');
+        final north = double.tryParse(bbox[1]?.toString() ?? '');
+        final west = double.tryParse(bbox[2]?.toString() ?? '');
+        final east = double.tryParse(bbox[3]?.toString() ?? '');
+        if (south != null && north != null && west != null && east != null) {
+          zoom = _zoomForBoundingBox(south, north, west, east);
+        }
+      }
+
+      locations.add(_SearchLocationResult(LatLng(lat, lon), zoom));
+    }
+
+    if (locations.isEmpty) return null;
+    if (_currentLocation == null) return locations.first;
+
+    final current = _currentLocation!;
+    locations.sort((a, b) {
+      final distA = const Distance().distance(current, a.center);
+      final distB = const Distance().distance(current, b.center);
+      return distA.compareTo(distB);
+    });
+    return locations.first;
+  }
+
+  Future<void> _searchAndMoveToLocation() async {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
+    setState(() {
+      _isSearchingLocation = true;
+    });
+    try {
+      final result = await _geocodeLocation(query);
+      if (result != null) {
+        _mapController.move(result.center, result.zoom);
+      }
+    } catch (e) {
+      debugPrint('Location search failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSearchingLocation = false;
+          _searchSuggestions = [];
+        });
+      }
+    }
+  }
+
+  void _onSearchTextChanged(String query) {
+    _searchDebounce?.cancel();
+    if (query.trim().length < 2) {
+      setState(() {
+        _searchSuggestions = [];
+      });
+      return;
+    }
+
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      _fetchSearchSuggestions(query);
+    });
+  }
+
+  Future<void> _fetchSearchSuggestions(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _searchSuggestions = [];
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearchingLocation = true;
+    });
+
+    try {
+      final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
+        'q': trimmed,
+        'format': 'json',
+        'limit': '5',
+      });
+      final response = await http.get(uri, headers: {
+        'User-Agent': 'longboard_app/1.0',
+      });
+      if (response.statusCode != 200) return;
+
+      final data = jsonDecode(response.body);
+      if (data is! List) return;
+
+      final suggestions = data
+          .map<_SearchSuggestion?>((item) {
+            final fullLabel = item['display_name']?.toString();
+            final lat = double.tryParse(item['lat']?.toString() ?? '');
+            final lon = double.tryParse(item['lon']?.toString() ?? '');
+            if (fullLabel == null || lat == null || lon == null) return null;
+
+            final label = _simplifySuggestionLabel(fullLabel);
+            double zoom = 15.0;
+            if (item['boundingbox'] is List && (item['boundingbox'] as List).length == 4) {
+              final bbox = item['boundingbox'] as List;
+              final south = double.tryParse(bbox[0]?.toString() ?? '');
+              final north = double.tryParse(bbox[1]?.toString() ?? '');
+              final west = double.tryParse(bbox[2]?.toString() ?? '');
+              final east = double.tryParse(bbox[3]?.toString() ?? '');
+              if (south != null && north != null && west != null && east != null) {
+                zoom = _zoomForBoundingBox(south, north, west, east);
+              }
+            }
+
+            return _SearchSuggestion(label, LatLng(lat, lon), zoom: zoom);
+          })
+          .whereType<_SearchSuggestion>()
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _searchSuggestions = suggestions;
+        });
+      }
+    } catch (e) {
+      debugPrint('Autocomplete fetch failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSearchingLocation = false;
+        });
+      }
+    }
+  }
+
+  void _selectSuggestion(_SearchSuggestion suggestion) {
+    _searchController.text = suggestion.label;
+    _searchSuggestions = [];
+    FocusScope.of(context).unfocus();
+    _mapController.move(suggestion.location, suggestion.zoom);
+  }
+
+  double _zoomForBoundingBox(double south, double north, double west, double east) {
+    final latDiff = (north - south).abs();
+    final lngDiff = (east - west).abs();
+    final maxDiff = math.max(latDiff, lngDiff);
+
+    if (maxDiff < 0.001) return 18.5;
+    if (maxDiff < 0.005) return 17.0;
+    if (maxDiff < 0.02) return 15.5;
+    if (maxDiff < 0.05) return 14.0;
+    if (maxDiff < 0.15) return 12.0;
+    if (maxDiff < 0.5) return 10.5;
+    if (maxDiff < 1.5) return 9.0;
+    if (maxDiff < 3.0) return 8.0;
+    return 6.5;
+  }
+
+  String _simplifySuggestionLabel(String fullLabel) {
+    final parts = fullLabel.split(',').map((part) => part.trim()).where((part) => part.isNotEmpty).toList();
+    if (parts.length <= 2) return fullLabel;
+    return parts.take(2).join(', ');
+  }
+
   Future<void> _appendLocationToLog(Position position) async {
     if (_sessionFile == null) return;
 
@@ -222,9 +428,15 @@ class _MyHomePageState extends State<MyHomePage> {
       _positionStreamSubscription = Geolocator.getPositionStream(
         locationSettings: locationSettings,
       ).listen((Position position) {
+        final newLocation = LatLng(position.latitude, position.longitude);
         setState(() {
-          _currentLocation = LatLng(position.latitude, position.longitude);
+          _currentLocation = newLocation;
         });
+
+        if (!_hasFocusedOnLocation) {
+          _hasFocusedOnLocation = true;
+          _mapController.move(newLocation, 15.0);
+        }
 
         if (_isSessionActive && !_isPaused) {
           _appendLocationToLog(position);
@@ -245,6 +457,9 @@ class _MyHomePageState extends State<MyHomePage> {
   void dispose() {
     // Crucial: Cancel the stream subscription to prevent memory leaks when widget is destroyed
     _positionStreamSubscription?.cancel();
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     _mapController.dispose();
     super.dispose();
   }
@@ -259,56 +474,149 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget content() {
     return Stack(
       children: [
-        // 1. Map Layer
-        FlutterMap(
-          mapController: _mapController, // Linked controller
-          options: const MapOptions(
-            initialCenter: LatLng(43.14795, -79.22791),
-            initialZoom: 9.2,
-            interactionOptions: InteractionOptions(
-              flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+        Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => FocusScope.of(context).unfocus(),
+          child: FlutterMap(
+            mapController: _mapController,
+            options: const MapOptions(
+              initialCenter: LatLng(0.0, 0.0),
+              initialZoom: 1.5,
+              interactionOptions: InteractionOptions(
+                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+              ),
             ),
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.cambion.longboard_app',
-            ),
-            if (_currentLocation != null)
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: _currentLocation!,
-                    width: 40,
-                    height: 40, 
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.purple.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.location_history, // Visual indicator icon
-                          color: Colors.purple,
-                          size: 30,
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.cambion.longboard_app',
+              ),
+              if (_currentLocation != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _currentLocation!,
+                      width: 40,
+                      height: 40,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.location_history,
+                            color: Colors.purple,
+                            size: 30,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ]
-              ),
-            RichAttributionWidget(
-              attributions: [
-                TextSourceAttribution(
-                  'OpenStreetMap contributors',
-                  onTap: () => launchUrl(Uri.parse('https://openstreetmap.org/copyright')), // (external)
+                  ],
                 ),
-              ],
-            ),
-          ],
+              RichAttributionWidget(
+                attributions: [
+                  TextSourceAttribution(
+                    'OpenStreetMap contributors',
+                    onTap: () => launchUrl(Uri.parse('https://openstreetmap.org/copyright')),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-
-        // 2. Bottom session control buttons
+        Positioned(
+          top: 80.0,
+          left: 16.0,
+          right: 16.0,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Material(
+                color: Colors.white.withOpacity(0.6),
+                elevation: 4,
+                borderRadius: BorderRadius.circular(28.0),
+                child: TextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  textInputAction: TextInputAction.search,
+                  onChanged: _onSearchTextChanged,
+                  onSubmitted: (_) => _searchAndMoveToLocation(),
+                  decoration: InputDecoration(
+                    hintText: 'Search location',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _isSearchingLocation
+                        ? const Padding(
+                            padding: EdgeInsets.all(12.0),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(28.0),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.55),
+                  ),
+                ),
+              ),
+              if (_searchSuggestions.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 8.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(12.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 12.0,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _searchSuggestions.length,
+                    itemBuilder: (context, index) {
+                      final suggestion = _searchSuggestions[index];
+                      return ListTile(
+                        title: Text(suggestion.label),
+                        onTap: () => _selectSuggestion(suggestion),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+        Positioned(
+          top: 160.0,
+          right: 24.0,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              shape: const CircleBorder(),
+              padding: const EdgeInsets.all(16),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              elevation: 6,
+            ),
+            onPressed: () {
+              setState(() {
+                _searchController.clear();
+                _searchSuggestions = [];
+              });
+              FocusScope.of(context).unfocus();
+              if (_currentLocation != null) {
+                _mapController.move(_currentLocation!, 15.0);
+              }
+            },
+            child: const Icon(Icons.my_location),
+          ),
+        ),
         Positioned(
           left: 0,
           right: 0,
@@ -366,29 +674,6 @@ class _MyHomePageState extends State<MyHomePage> {
             ],
           ),
         ),
-
-        // 3. Overlay Floating GPS Button in top right
-        Positioned(
-          top: 24.0,
-          right: 24.0,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              shape: const CircleBorder(), // Makes the button perfectly round
-              padding: const EdgeInsets.all(16), // Padding around the icon
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              elevation: 6,
-            ),
-            onPressed: () {
-              if (_currentLocation != null) {
-                _mapController.move(_currentLocation!, 15.0);
-              }
-            },
-            child: const Icon(Icons.my_location),
-          ),
-        ),
-
-        // 4. Session history button at bottom right when no active session
         if (!_isSessionActive)
           Positioned(
             bottom: 24.0,
