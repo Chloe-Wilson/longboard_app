@@ -96,6 +96,10 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isPaused = false;
   File? _sessionFile;
   String? _currentSessionName;
+  Timer? _sessionTimer;
+  Duration _sessionDuration = Duration.zero;
+  Duration _sessionAccumulatedDuration = Duration.zero;
+  DateTime? _sessionResumeTime;
 
   @override
   void initState() {
@@ -118,11 +122,26 @@ class _MyHomePageState extends State<MyHomePage> {
       _currentSessionName = sessionName;
       _isSessionActive = true;
       _isPaused = false;
+      _sessionDuration = Duration.zero;
+      _sessionAccumulatedDuration = Duration.zero;
+      _sessionResumeTime = DateTime.now();
     });
+    _startSessionTimer();
   }
 
   void _pauseResumeSession() {
     if (!_isSessionActive) return;
+
+    if (_isPaused) {
+      _sessionResumeTime = DateTime.now();
+      _startSessionTimer();
+    } else {
+      if (_sessionResumeTime != null) {
+        _sessionAccumulatedDuration += DateTime.now().difference(_sessionResumeTime!);
+        _sessionResumeTime = null;
+      }
+      _stopSessionTimer();
+    }
 
     setState(() {
       _isPaused = !_isPaused;
@@ -141,11 +160,16 @@ class _MyHomePageState extends State<MyHomePage> {
       await _writeSessionHeader(file, sessionName);
     }
 
+    _stopSessionTimer();
+
     setState(() {
       _isSessionActive = false;
       _isPaused = false;
       _sessionFile = null;
       _currentSessionName = null;
+      _sessionDuration = Duration.zero;
+      _sessionAccumulatedDuration = Duration.zero;
+      _sessionResumeTime = null;
     });
   }
 
@@ -210,6 +234,39 @@ class _MyHomePageState extends State<MyHomePage> {
     } else {
       await file.writeAsString('$header$contents');
     }
+  }
+
+  void _startSessionTimer() {
+    _sessionTimer?.cancel();
+    _sessionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _updateSessionDuration();
+    });
+    _updateSessionDuration();
+  }
+
+  void _stopSessionTimer() {
+    _sessionTimer?.cancel();
+    _sessionTimer = null;
+  }
+
+  void _updateSessionDuration() {
+    if (!_isSessionActive || _sessionResumeTime == null) return;
+    final elapsedSinceResume = DateTime.now().difference(_sessionResumeTime!);
+    if (mounted) {
+      setState(() {
+        _sessionDuration = _sessionAccumulatedDuration + elapsedSinceResume;
+      });
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    final hoursPart = hours > 0 ? '${hours.toString().padLeft(2, '0')}:' : '';
+    final minutesPart = '${minutes.toString().padLeft(2, '0')}:';
+    final secondsPart = seconds.toString().padLeft(2, '0');
+    return '$hoursPart$minutesPart$secondsPart';
   }
 
   void _openSessionHistoryPage() {
@@ -458,6 +515,7 @@ class _MyHomePageState extends State<MyHomePage> {
     // Crucial: Cancel the stream subscription to prevent memory leaks when widget is destroyed
     _positionStreamSubscription?.cancel();
     _searchDebounce?.cancel();
+    _sessionTimer?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
     _mapController.dispose();
@@ -533,7 +591,7 @@ class _MyHomePageState extends State<MyHomePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Material(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 elevation: 4,
                 borderRadius: BorderRadius.circular(28.0),
                 child: TextField(
@@ -560,7 +618,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       borderSide: BorderSide.none,
                     ),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.55),
+                    fillColor: Colors.white.withValues(alpha: 0.55),
                   ),
                 ),
               ),
@@ -568,11 +626,11 @@ class _MyHomePageState extends State<MyHomePage> {
                 Container(
                   margin: const EdgeInsets.only(top: 8.0),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.95),
+                    color: Colors.white.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(12.0),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
+                        color: Colors.black.withValues(alpha: 0.15),
                         blurRadius: 12.0,
                         offset: const Offset(0, 4),
                       ),
@@ -624,18 +682,27 @@ class _MyHomePageState extends State<MyHomePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_currentSessionName != null)
+              if (_isSessionActive)
                 Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 24.0),
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+                  margin: const EdgeInsets.only(bottom: 12.0),
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 14.0),
                   decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(8.0),
+                    color: Colors.white..withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(20.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black..withValues(alpha: 0.12),
+                        blurRadius: 8.0,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Text(
-                    'Session: $_currentSessionName${_isPaused ? ' (paused)' : ''}',
-                    style: const TextStyle(color: Colors.white),
-                    textAlign: TextAlign.center,
+                    'Session time: ${_formatDuration(_sessionDuration)}',
+                    style: const TextStyle(
+                      fontSize: 16.0,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               if (_currentSessionName != null)
@@ -871,7 +938,7 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
           return ListView.separated(
             padding: const EdgeInsets.all(16.0),
             itemCount: sessions.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12.0),
+            separatorBuilder: (_, _) => const SizedBox(height: 12.0),
             itemBuilder: (context, index) {
               final summary = sessions[index];
               final details =
@@ -880,7 +947,7 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
                   'Avg ${_formatSpeed(summary.averageSpeedKmh)}, max ${_formatSpeed(summary.maxSpeedKmh)}';
               return ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                tileColor: Theme.of(context).colorScheme.surfaceVariant,
+                tileColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12.0),
                 ),
