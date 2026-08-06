@@ -31,15 +31,21 @@ class HomePageController {
   Future<void> stopSession(BuildContext context) async {
     if (!sessionController.isSessionActive) return;
 
-    final defaultSessionName = await session_helpers.nextSessionDefaultName();
+    final sessionFile = sessionController.sessionFile;
+    sessionController.stopSession();
+
+    final defaultSessionName = _defaultSessionName();
     final enteredName = await _promptSessionName(context, defaultSessionName);
     final sessionName = enteredName.isNotEmpty ? enteredName : defaultSessionName;
 
-    if (sessionController.sessionFile != null) {
-      await session_helpers.writeSessionHeader(sessionController.sessionFile!, sessionName);
+    if (sessionFile != null) {
+      session_helpers.writeSessionHeader(sessionFile, sessionName);
     }
+  }
 
-    await sessionController.stopSession();
+  String _defaultSessionName() {
+    final date = DateTime.now();
+    return 'Session ${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}_${date.hour.toString().padLeft(2, '0')}.${date.minute.toString().padLeft(2, '0')}';
   }
 
   Future<String> _promptSessionName(BuildContext context, String fallbackName) async {

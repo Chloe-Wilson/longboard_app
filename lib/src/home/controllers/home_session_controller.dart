@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -18,25 +19,22 @@ class HomeSessionController {
   File? sessionFile;
   String? currentSessionName;
   Duration sessionDuration = Duration.zero;
+  final ValueNotifier<Duration> sessionDurationNotifier = ValueNotifier(Duration.zero);
   Duration sessionAccumulatedDuration = Duration.zero;
   DateTime? sessionResumeTime;
   Timer? _sessionTimer;
 
   void dispose() {
     _sessionTimer?.cancel();
+    sessionDurationNotifier.dispose();
   }
 
   Future<void> startNewSession() async {
-    final directory = await getApplicationDocumentsDirectory();
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
     final sessionName = 'longboard_session_$timestamp.txt';
-    final file = File('${directory.path}/$sessionName');
-    if (!await file.exists()) {
-      await file.create(recursive: true);
-    }
 
     setState(() {
-      sessionFile = file;
+      sessionFile = null;
       currentSessionName = sessionName;
       isSessionActive = true;
       isPaused = false;
@@ -44,7 +42,22 @@ class HomeSessionController {
       sessionAccumulatedDuration = Duration.zero;
       sessionResumeTime = DateTime.now();
     });
+    sessionDurationNotifier.value = Duration.zero;
     _startSessionTimer();
+
+    unawaited(_createSessionFile(sessionName));
+  }
+
+  Future<void> _createSessionFile(String sessionName) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File('${directory.path}/$sessionName');
+    if (!await file.exists()) {
+      await file.create(recursive: true);
+    }
+
+    if (isSessionActive && currentSessionName == sessionName) {
+      sessionFile = file;
+    }
   }
 
   void pauseResumeSession() {
@@ -69,22 +82,20 @@ class HomeSessionController {
   Future<void> stopSession() async {
     if (!isSessionActive) return;
 
+    _stopSessionTimer();
     setState(() {
       isSessionActive = false;
       isPaused = false;
-      sessionFile = null;
-      currentSessionName = null;
       sessionDuration = Duration.zero;
       sessionAccumulatedDuration = Duration.zero;
       sessionResumeTime = null;
     });
-
-    _stopSessionTimer();
+    sessionDurationNotifier.value = Duration.zero;
   }
 
   void _startSessionTimer() {
     _sessionTimer?.cancel();
-    _sessionTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+    _sessionTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
       _updateSessionDuration();
     });
     _updateSessionDuration();
@@ -98,9 +109,9 @@ class HomeSessionController {
   void _updateSessionDuration() {
     if (!isSessionActive || sessionResumeTime == null) return;
     final elapsedSinceResume = DateTime.now().difference(sessionResumeTime!);
-    setState(() {
-      sessionDuration = sessionAccumulatedDuration + elapsedSinceResume;
-    });
+    final updatedDuration = sessionAccumulatedDuration + elapsedSinceResume;
+    sessionDuration = updatedDuration;
+    sessionDurationNotifier.value = updatedDuration;
   }
 
   Future<void> appendLocationToLog(Position position) async {

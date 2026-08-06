@@ -29,15 +29,16 @@ class _MyHomePageState extends State<MyHomePage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
-  final homePageController = HomePageController(setState: (fn) => fn());
+  late final HomePageController homePageController;
 
   StreamSubscription<Position>? _positionStreamSubscription;
-  Timer? _positionPollTimer;
-  bool _isFetchingPosition = false;
+  Timer? _gpsLogTimer;
+  Position? _latestPosition;
 
   @override
   void initState() {
     super.initState();
+    homePageController = HomePageController(setState: setState);
     _startLocationTracking();
   }
 
@@ -47,16 +48,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _stopSession() async {
     await homePageController.stopSession(context);
-  }
-
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    final hoursPart = hours > 0 ? '${hours.toString().padLeft(2, '0')}:' : '';
-    final minutesPart = '${minutes.toString().padLeft(2, '0')}:';
-    final secondsPart = seconds.toString().padLeft(2, '0');
-    return '$hoursPart$minutesPart$secondsPart';
   }
 
   void _openSessionHistoryPage() {
@@ -87,36 +78,15 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
 
-  Future<void> _appendLocationToLog(Position position) async {
-    await homePageController.appendLocationToLog(position);
-  }
+  void _startGpsLogging() {
+    _gpsLogTimer?.cancel();
+    _gpsLogTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final position = _latestPosition;
+      if (position == null) return;
+      if (!homePageController.sessionController.isSessionActive) return;
+      if (homePageController.sessionController.isPaused) return;
 
-  void _startPositionPolling() {
-    _positionPollTimer?.cancel();
-    _positionPollTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
-      if (_isFetchingPosition) return;
-
-      _isFetchingPosition = true;
-      try {
-        final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
-
-        final newLocation = LatLng(position.latitude, position.longitude);
-        if (mounted) {
-          setState(() {
-            _currentLocation = newLocation;
-          });
-        }
-
-        if (homePageController.sessionController.isSessionActive && !homePageController.sessionController.isPaused) {
-          await _appendLocationToLog(position);
-        }
-      } catch (e) {
-        debugPrint('Position polling error: $e');
-      } finally {
-        _isFetchingPosition = false;
-      }
+      homePageController.appendLocationToLog(position);
     });
   }
 
@@ -132,6 +102,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _positionStreamSubscription = Geolocator.getPositionStream(
         locationSettings: locationSettings,
       ).listen((Position position) {
+        _latestPosition = position;
         final newLocation = LatLng(position.latitude, position.longitude);
         setState(() {
           _currentLocation = newLocation;
@@ -145,7 +116,7 @@ class _MyHomePageState extends State<MyHomePage> {
         debugPrint('Location stream error: $error');
       });
 
-      _startPositionPolling();
+      _startGpsLogging();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -158,7 +129,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void dispose() {
     _positionStreamSubscription?.cancel();
-    _positionPollTimer?.cancel();
+    _gpsLogTimer?.cancel();
     homePageController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -207,7 +178,7 @@ class _MyHomePageState extends State<MyHomePage> {
         HomeSessionControls(
           isSessionActive: homePageController.sessionController.isSessionActive,
           isPaused: homePageController.sessionController.isPaused,
-          sessionDuration: _formatDuration(homePageController.sessionController.sessionDuration),
+          sessionDurationListenable: homePageController.sessionController.sessionDurationNotifier,
           onStartSession: _startNewSession,
           onStopSession: _stopSession,
           onPauseResumeSession: _pauseResumeSession,

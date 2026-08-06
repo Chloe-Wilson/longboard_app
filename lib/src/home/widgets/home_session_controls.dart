@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class HomeSessionControls extends StatelessWidget {
@@ -5,7 +6,7 @@ class HomeSessionControls extends StatelessWidget {
     super.key,
     required this.isSessionActive,
     required this.isPaused,
-    required this.sessionDuration,
+    required this.sessionDurationListenable,
     required this.onStartSession,
     required this.onStopSession,
     required this.onPauseResumeSession,
@@ -14,7 +15,7 @@ class HomeSessionControls extends StatelessWidget {
 
   final bool isSessionActive;
   final bool isPaused;
-  final String sessionDuration;
+  final ValueListenable<Duration> sessionDurationListenable;
   final VoidCallback onStartSession;
   final VoidCallback onStopSession;
   final VoidCallback onPauseResumeSession;
@@ -32,27 +33,40 @@ class HomeSessionControls extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (isSessionActive)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 12.0),
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 14.0),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(230),
-                    borderRadius: BorderRadius.circular(20.0),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(31),
-                        blurRadius: 8.0,
-                        offset: const Offset(0, 4),
+                ValueListenableBuilder<Duration>(
+                  valueListenable: sessionDurationListenable,
+                  builder: (context, sessionDuration, child) {
+                    final hours = sessionDuration.inHours;
+                    final minutes = sessionDuration.inMinutes.remainder(60);
+                    final seconds = sessionDuration.inSeconds.remainder(60);
+                    final hoursPart = hours > 0 ? '${hours.toString().padLeft(2, '0')}:' : '';
+                    final minutesPart = '${minutes.toString().padLeft(2, '0')}:';
+                    final secondsPart = seconds.toString().padLeft(2, '0');
+                    final durationText = '$hoursPart$minutesPart$secondsPart';
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12.0),
+                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 14.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(230),
+                        borderRadius: BorderRadius.circular(20.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(31),
+                            blurRadius: 8.0,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Text(
-                    'Session time: $sessionDuration',
-                    style: const TextStyle(
-                      fontSize: 16.0,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                      child: Text(
+                        'Session time: $durationText',
+                        style: const TextStyle(
+                          fontSize: 16.0,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

@@ -1,28 +1,6 @@
 import 'dart:io';
 
 import 'package:geolocator/geolocator.dart';
-import 'package:path_provider/path_provider.dart';
-
-Future<String> nextSessionDefaultName() async {
-  final directory = await getApplicationDocumentsDirectory();
-  final entities = await directory.list().toList();
-  int maxNumber = 0;
-
-  for (final entity in entities.whereType<File>()) {
-    final content = await entity.readAsLines();
-    if (content.isEmpty) continue;
-    final firstLine = content.first.trim();
-    if (!firstLine.startsWith('# SessionName:')) continue;
-    final name = firstLine.replaceFirst('# SessionName:', '').trim();
-    final match = RegExp(r'^Session #(\d+)$').firstMatch(name);
-    if (match != null) {
-      final number = int.tryParse(match.group(1) ?? '') ?? 0;
-      maxNumber = number > maxNumber ? number : maxNumber;
-    }
-  }
-
-  return 'Session #${maxNumber + 1}';
-}
 
 Future<void> writeSessionHeader(File file, String sessionName) async {
   final header = '# SessionName: $sessionName\n';
