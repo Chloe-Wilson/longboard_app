@@ -5,6 +5,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'session_detail_page.dart';
+import '../../session/helpers/session_helpers.dart' as session_helpers;
+import '../../session/models/logged_positions.dart';
 
 class SessionHistoryPage extends StatefulWidget {
   const SessionHistoryPage({super.key});
@@ -42,7 +44,7 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
 
   Future<_SessionSummary> _parseSessionFile(File file) async {
     final lines = await file.readAsLines();
-    final positions = <_LoggedPosition>[];
+    final positions = <LoggedPosition>[];
     final rawLines = lines.where((line) => line.trim().isNotEmpty).toList();
     for (var index = 0; index < rawLines.length; index++) {
       final line = rawLines[index].trim();
@@ -52,12 +54,14 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
       final parts = line.split(',');
       if (parts.length < 3) continue;
       try {
-        final timestamp = DateTime.parse(parts[0]);
+        final timestamp = session_helpers.parseLogDuration(parts[0]);
         final latitude = double.parse(parts[1]);
         final longitude = double.parse(parts[2]);
-        positions.add(_LoggedPosition(
+        final speed = double.parse(parts[4]);
+        positions.add(LoggedPosition(
           timestamp: timestamp,
           location: LatLng(latitude, longitude),
+          speed: speed,
         ));
       } catch (_) {
         continue;
@@ -65,31 +69,26 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
     }
 
     final duration = positions.length >= 2
-        ? positions.last.timestamp.difference(positions.first.timestamp)
+        ? positions.last.timestamp
         : Duration.zero;
 
     double totalDistance = 0.0;
     double maxSpeedMps = 0.0;
+    Duration activeDuration = Duration.zero;
 
     for (var i = 1; i < positions.length; i++) {
-      final previous = positions[i - 1];
-      final current = positions[i];
-      final segmentDistance = const Distance().distance(
-        previous.location,
-        current.location,
-      );
-      final seconds = current.timestamp.difference(previous.timestamp).inMilliseconds / 1000.0;
-      totalDistance += segmentDistance;
-      if (seconds > 0) {
-        final speedMps = segmentDistance / seconds;
-        if (speedMps > maxSpeedMps) {
-          maxSpeedMps = speedMps;
+      if (positions[i].speed > .277) {
+        totalDistance += positions[i].speed * (i > 0 ? positions[i].timestamp.inSeconds - positions[i - 1].timestamp.inSeconds : 0);
+        if (positions[i].speed > maxSpeedMps) {
+          maxSpeedMps = positions[i].speed;
         }
+        activeDuration += positions[i].timestamp - positions[i - 1].timestamp;
       }
+      
     }
 
-    final averageSpeedKmh = duration.inSeconds > 0
-        ? (totalDistance / duration.inSeconds) * 3.6
+    final averageSpeedKmh = activeDuration.inSeconds > 0
+        ? (totalDistance / activeDuration.inSeconds) * 3.6
         : 0.0;
     final maxSpeedKmh = maxSpeedMps * 3.6;
 
@@ -104,7 +103,9 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
     return _SessionSummary(
       file: file,
       sessionName: sessionName,
-      duration: duration,
+      totalDuration: duration,
+      activeDuration: activeDuration,
+      restDuration: duration - activeDuration,
       distanceMeters: totalDistance,
       averageSpeedKmh: averageSpeedKmh,
       maxSpeedKmh: maxSpeedKmh,
@@ -186,7 +187,7 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
             itemBuilder: (context, index) {
               final summary = sessions[index];
               final details =
-                  '${_formatDuration(summary.duration)} • ${_formatDistance(summary.distanceMeters)}';
+                  '${_formatDuration(summary.totalDuration)} • ${_formatDistance(summary.distanceMeters)}';
               final stats =
                   'Avg ${_formatSpeed(summary.averageSpeedKmh)}, max ${_formatSpeed(summary.maxSpeedKmh)}';
               return ListTile(
@@ -226,18 +227,13 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
   }
 }
 
-class _LoggedPosition {
-  _LoggedPosition({required this.timestamp, required this.location});
-
-  final DateTime timestamp;
-  final LatLng location;
-}
-
 class _SessionSummary {
   _SessionSummary({
     required this.file,
     required this.sessionName,
-    required this.duration,
+    required this.totalDuration,
+    required this.activeDuration,
+    required this.restDuration,
     required this.distanceMeters,
     required this.averageSpeedKmh,
     required this.maxSpeedKmh,
@@ -245,7 +241,9 @@ class _SessionSummary {
 
   final File file;
   final String sessionName;
-  final Duration duration;
+  final Duration totalDuration;
+  final Duration activeDuration;
+  final Duration restDuration;
   final double distanceMeters;
   final double averageSpeedKmh;
   final double maxSpeedKmh;

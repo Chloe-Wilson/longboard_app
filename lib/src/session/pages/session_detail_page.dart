@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../session/helpers/session_helpers.dart' as session_helpers;
+import '../../session/models/logged_positions.dart';
+
 class SessionDetailPage extends StatefulWidget {
   const SessionDetailPage({
     super.key,
@@ -20,7 +23,7 @@ class SessionDetailPage extends StatefulWidget {
 
 class _SessionDetailPageState extends State<SessionDetailPage> {
   final MapController _mapController = MapController();
-  late Future<List<_LoggedPosition>> _positionsFuture;
+  late Future<List<LoggedPosition>> _positionsFuture;
 
   @override
   void initState() {
@@ -28,9 +31,9 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
     _positionsFuture = _loadPositions();
   }
 
-  Future<List<_LoggedPosition>> _loadPositions() async {
+  Future<List<LoggedPosition>> _loadPositions() async {
     final lines = await widget.sessionFile.readAsLines();
-    final positions = <_LoggedPosition>[];
+    final positions = <LoggedPosition>[];
 
     for (final rawLine in lines) {
       final line = rawLine.trim();
@@ -38,12 +41,14 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
       final parts = line.split(',');
       if (parts.length < 3) continue;
       try {
-        final timestamp = DateTime.parse(parts[0]);
+        final timestamp = session_helpers.parseLogDuration(parts[0]);
         final latitude = double.parse(parts[1]);
         final longitude = double.parse(parts[2]);
-        positions.add(_LoggedPosition(
+        final speed = double.parse(parts[4]);
+        positions.add(LoggedPosition(
           timestamp: timestamp,
           location: LatLng(latitude, longitude),
+          speed: speed,
         ));
       } catch (_) {
         continue;
@@ -58,7 +63,7 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
       appBar: AppBar(
         title: Text(widget.sessionName),
       ),
-      body: FutureBuilder<List<_LoggedPosition>>(
+      body: FutureBuilder<List<LoggedPosition>>(
         future: _positionsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -130,11 +135,4 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
       ),
     );
   }
-}
-
-class _LoggedPosition {
-  _LoggedPosition({required this.timestamp, required this.location});
-
-  final DateTime timestamp;
-  final LatLng location;
 }

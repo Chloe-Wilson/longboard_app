@@ -116,6 +116,6 @@ class HomeSessionController {
 
   Future<void> appendLocationToLog(Position position) async {
     if (sessionFile == null) return;
-    await session_helpers.appendLocationToLog(sessionFile!, position);
+    await session_helpers.appendLocationToLog(sessionFile!, position, sessionDuration);
   }
 }

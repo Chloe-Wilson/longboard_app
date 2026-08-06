@@ -13,9 +13,8 @@ Future<void> writeSessionHeader(File file, String sessionName) async {
   }
 }
 
-Future<void> appendLocationToLog(File sessionFile, Position position) async {
-  final timestamp = DateTime.now().toIso8601String();
-  final logLine = '$timestamp,${position.latitude},${position.longitude},${position.accuracy}\n';
+Future<void> appendLocationToLog(File sessionFile, Position position, Duration sessionDuration) async {
+  final logLine = '$sessionDuration,${position.latitude},${position.longitude},${position.accuracy},${position.speed}\n';
 
   try {
     await sessionFile.writeAsString(logLine, mode: FileMode.append, flush: true);
@@ -35,4 +34,20 @@ String formatDuration(Duration duration) {
   final secondsPart = seconds.toString().padLeft(2, '0');
 
   return '$hoursPart$minutesPart$secondsPart';
+}
+
+Duration parseLogDuration(String input) {
+  // Regex matches: hours:minutes:seconds.microseconds
+  final regExp = RegExp(r'^(\d+):(\d+):(\d+)\.(\d+)$');
+  final match = regExp.firstMatch(input.trim());
+  
+  if (match == null) throw FormatException('Invalid duration format');
+
+  return Duration(
+    hours: int.parse(match[1]!),
+    minutes: int.parse(match[2]!),
+    seconds: int.parse(match[3]!),
+    // Truncate or pad microseconds to ensure it fits safely
+    microseconds: int.parse(match[4]!.padRight(6, '0').substring(0, 6)),
+  );
 }
