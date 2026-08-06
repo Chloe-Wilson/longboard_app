@@ -38,6 +38,7 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
     for (final rawLine in lines) {
       final line = rawLine.trim();
       if (line.isEmpty) continue;
+      if (line.startsWith('#')) continue;
       final parts = line.split(',');
       if (parts.length < 3) continue;
       try {

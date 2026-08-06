@@ -46,10 +46,15 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
     final lines = await file.readAsLines();
     final positions = <LoggedPosition>[];
     final rawLines = lines.where((line) => line.trim().isNotEmpty).toList();
+    bool hasSummary = false;
     for (var index = 0; index < rawLines.length; index++) {
       final line = rawLines[index].trim();
       if (index == 0 && line.startsWith('# SessionName:')) {
         continue;
+      }
+      if (index == 1 && line.startsWith('# Summary:')) {
+        hasSummary = true;
+        break;
       }
       final parts = line.split(',');
       if (parts.length < 3) continue;
@@ -68,30 +73,6 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
       }
     }
 
-    final duration = positions.length >= 2
-        ? positions.last.timestamp
-        : Duration.zero;
-
-    double totalDistance = 0.0;
-    double maxSpeedMps = 0.0;
-    Duration activeDuration = Duration.zero;
-
-    for (var i = 1; i < positions.length; i++) {
-      if (positions[i].speed > .277) {
-        totalDistance += positions[i].speed * (i > 0 ? positions[i].timestamp.inSeconds - positions[i - 1].timestamp.inSeconds : 0);
-        if (positions[i].speed > maxSpeedMps) {
-          maxSpeedMps = positions[i].speed;
-        }
-        activeDuration += positions[i].timestamp - positions[i - 1].timestamp;
-      }
-      
-    }
-
-    final averageSpeedKmh = activeDuration.inSeconds > 0
-        ? (totalDistance / activeDuration.inSeconds) * 3.6
-        : 0.0;
-    final maxSpeedKmh = maxSpeedMps * 3.6;
-
     var sessionName = file.path.split(Platform.pathSeparator).last;
     if (lines.isNotEmpty && lines.first.trim().startsWith('# SessionName:')) {
       final headerName = lines.first.trim().replaceFirst('# SessionName:', '').trim();
@@ -100,16 +81,56 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
       }
     }
 
-    return _SessionSummary(
-      file: file,
-      sessionName: sessionName,
-      totalDuration: duration,
-      activeDuration: activeDuration,
-      restDuration: duration - activeDuration,
-      distanceMeters: totalDistance,
-      averageSpeedKmh: averageSpeedKmh,
-      maxSpeedKmh: maxSpeedKmh,
-    );
+    if (hasSummary) {
+      final summary = lines[1].trim().replaceFirst('# Summary:', '').trim().split(',');
+      return _SessionSummary(
+        file: file,
+        sessionName: sessionName,
+        totalDuration: session_helpers.parseLogDuration(summary[0]),
+        activeDuration: session_helpers.parseLogDuration(summary[1]),
+        restDuration: session_helpers.parseLogDuration(summary[2]),
+        distanceMeters: double.parse(summary[3]),
+        averageSpeedKmh: double.parse(summary[4]),
+        maxSpeedKmh: double.parse(summary[5]),
+      );
+    } else {
+      final duration = positions.length >= 2
+        ? positions.last.timestamp
+        : Duration.zero;
+
+      double totalDistance = 0.0;
+      double maxSpeedMps = 0.0;
+      Duration activeDuration = Duration.zero;
+
+      for (var i = 1; i < positions.length; i++) {
+        if (positions[i].speed > .277) {
+          totalDistance += positions[i].speed * (i > 0 ? positions[i].timestamp.inSeconds - positions[i - 1].timestamp.inSeconds : 0);
+          if (positions[i].speed > maxSpeedMps) {
+            maxSpeedMps = positions[i].speed;
+          }
+          activeDuration += positions[i].timestamp - positions[i - 1].timestamp;
+        }
+        
+      }
+
+      final averageSpeedKmh = activeDuration.inSeconds > 0
+          ? (totalDistance / activeDuration.inSeconds) * 3.6
+          : 0.0;
+      final maxSpeedKmh = maxSpeedMps * 3.6;
+
+      session_helpers.writeSessionHeader(file, sessionName, '$duration,$activeDuration,${duration - activeDuration},$totalDistance,$averageSpeedKmh,$maxSpeedKmh');
+
+      return _SessionSummary(
+        file: file,
+        sessionName: sessionName,
+        totalDuration: duration,
+        activeDuration: activeDuration,
+        restDuration: duration - activeDuration,
+        distanceMeters: totalDistance,
+        averageSpeedKmh: averageSpeedKmh,
+        maxSpeedKmh: maxSpeedKmh,
+      );
+    }
   }
 
   Future<void> _deleteSession(File file) async {

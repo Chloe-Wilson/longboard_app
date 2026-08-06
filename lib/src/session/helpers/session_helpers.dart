@@ -2,14 +2,22 @@ import 'dart:io';
 
 import 'package:geolocator/geolocator.dart';
 
-Future<void> writeSessionHeader(File file, String sessionName) async {
-  final header = '# SessionName: $sessionName\n';
+Future<void> writeSessionHeader(File file, String sessionName, [String summary = '']) async {
+  final header = '# SessionName: $sessionName';
+  
+  final formattedSummary = summary.isNotEmpty ? '\n# Summary: $summary' : '';
+  final newHeaderBlock = '$header$formattedSummary\n';
+
   final contents = await file.readAsString();
+
   if (contents.startsWith('# SessionName:')) {
-    final remaining = contents.split('\n').skip(1).join('\n');
-    await file.writeAsString('$header$remaining');
+    final firstNewlineIndex = contents.indexOf('\n');
+    final remaining = firstNewlineIndex != -1 
+        ? contents.substring(firstNewlineIndex + 1) 
+        : '';
+    await file.writeAsString('$newHeaderBlock$remaining');
   } else {
-    await file.writeAsString('$header$contents');
+    await file.writeAsString('$newHeaderBlock$contents');
   }
 }
 
