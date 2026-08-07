@@ -78,8 +78,8 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
             return const Center(child: Text('No GPS points available.'));
           }
 
-          final polylinePoints = positions.map((p) => p.location).toList();
-          final center = polylinePoints.first;
+          // final polylinePoints = positions.map((p) => p.location).toList();
+          final center = positions.first.location;
 
           return FlutterMap(
             mapController: _mapController,
@@ -97,35 +97,36 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
               ),
               PolylineLayer(
                 polylines: [
-                  Polyline(
-                    points: polylinePoints,
-                    color: Colors.blueAccent,
-                    strokeWidth: 4.0,
-                    strokeCap: StrokeCap.round,
-                    strokeJoin: StrokeJoin.round,
-                  ),
+                  for (var i = 1; i < positions.length; i++)
+                    Polyline(
+                      points: [positions[i - 1].location, positions[i].location],
+                      color: session_helpers.getSpeedColor(positions[i].speed),
+                      strokeWidth: 4.0,
+                      strokeCap: StrokeCap.round,
+                      strokeJoin: StrokeJoin.round,
+                    ),
                 ],
               ),
               MarkerLayer(
                 markers: [
                   Marker(
-                    point: polylinePoints.first,
+                    point: positions.first.location,
                     width: 30,
                     height: 30,
                     child: const Icon(
                       Icons.play_arrow,
                       color: Colors.green,
-                      size: 32,
+                      size: 20,
                     ),
                   ),
                   Marker(
-                    point: polylinePoints.last,
+                    point: positions.last.location,
                     width: 30,
                     height: 30,
                     child: const Icon(
                       Icons.stop,
                       color: Colors.red,
-                      size: 32,
+                      size: 20,
                     ),
                   ),
                 ],

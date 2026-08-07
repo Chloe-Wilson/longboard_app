@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 Future<void> writeSessionHeader(File file, String sessionName, [String summary = '']) async {
@@ -58,4 +59,16 @@ Duration parseLogDuration(String input) {
     // Truncate or pad microseconds to ensure it fits safely
     microseconds: int.parse(match[4]!.padRight(6, '0').substring(0, 6)),
   );
+}
+
+Color getSpeedColor(double speedKmh) {
+  if (speedKmh < 2.777) {
+    return Colors.green;
+  } else if (speedKmh < 4.166) {
+    return Colors.yellow;
+  } else if (speedKmh < 5.555) {
+    return Colors.orange;
+  } else {
+    return Colors.red;
+  }
 }
