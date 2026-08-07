@@ -90,15 +90,15 @@ Duration parseLogDuration(String input) {
   );
 }
 
-Color getSpeedColor(double speedKmh) {
-  if (speedKmh < 2.777) {
-    return Colors.green;
-  } else if (speedKmh < 4.166) {
-    return Colors.yellow;
-  } else if (speedKmh < 5.555) {
-    return Colors.orange;
+Color getSpeedColor(double speed) {
+  if (speed < 2.777) {
+    return Color.fromRGBO(0, 255, 0, 1.0);
+  } else if (speed < 4.166) {
+    return Color.fromRGBO((255*(speed-2.777)/1.388).toInt().clamp(0, 255), 255, 0, 1.0);
+  } else if (speed < 5.555) {
+    return Color.fromRGBO(255, (255-90*(speed-4.166)/1.388).toInt().clamp(165, 255), 0, 1.0);
   } else {
-    return Colors.red;
+    return Color.fromRGBO(255, (165-165*(speed-5.555)/1.388).toInt().clamp(0, 165), 0, 1.0);
   }
 }
 

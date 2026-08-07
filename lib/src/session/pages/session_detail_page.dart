@@ -100,7 +100,10 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
                   for (var i = 1; i < smoothedPositions.length; i++)
                     Polyline(
                       points: [smoothedPositions[i - 1].location, smoothedPositions[i].location],
-                      color: session_helpers.getSpeedColor(smoothedPositions[i].speed),
+                      gradientColors: [
+                        session_helpers.getSpeedColor(smoothedPositions[i - 1].speed),
+                        session_helpers.getSpeedColor(smoothedPositions[i].speed),
+                      ],
                       strokeWidth: 4.0,
                       strokeCap: StrokeCap.round,
                       strokeJoin: StrokeJoin.round,
