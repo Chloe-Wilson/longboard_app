@@ -78,8 +78,8 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
             return const Center(child: Text('No GPS points available.'));
           }
 
-          // final polylinePoints = positions.map((p) => p.location).toList();
           final center = positions.first.location;
+          final smoothedPositions = session_helpers.smoothPositions(positions, segments: 8);
 
           return FlutterMap(
             mapController: _mapController,
@@ -97,10 +97,10 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
               ),
               PolylineLayer(
                 polylines: [
-                  for (var i = 1; i < positions.length; i++)
+                  for (var i = 1; i < smoothedPositions.length; i++)
                     Polyline(
-                      points: [positions[i - 1].location, positions[i].location],
-                      color: session_helpers.getSpeedColor(positions[i].speed),
+                      points: [smoothedPositions[i - 1].location, smoothedPositions[i].location],
+                      color: session_helpers.getSpeedColor(smoothedPositions[i].speed),
                       strokeWidth: 4.0,
                       strokeCap: StrokeCap.round,
                       strokeJoin: StrokeJoin.round,

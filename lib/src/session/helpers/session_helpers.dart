@@ -1,7 +1,13 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
+// import 'package:bezier/bezier.dart';
+// import 'package:vector_math/vector_math_64.dart' as vector;
+
+import 'package:longboard_app/src/session/models/logged_positions.dart';
 
 Future<void> writeSessionHeader(File file, String sessionName, [String summary = '']) async {
   final header = '# SessionName: $sessionName';
@@ -26,10 +32,35 @@ Future<void> appendLocationToLog(File sessionFile, Position position, Duration s
   final logLine = '$sessionDuration,${position.latitude},${position.longitude},${position.accuracy},${position.speed}\n';
 
   try {
+    if (await sessionFile.exists()) {
+      final lines = await sessionFile.readAsLines();
+
+      if (lines.isNotEmpty) {
+        final segments = lines.last.split(',');
+
+        if (segments.length >= 3) {
+          final lastLatitude = segments[1];
+          final lastLongitude = segments[2];
+
+          if (lastLatitude == position.latitude.toString() && 
+              lastLongitude == position.longitude.toString()) {
+            
+            lines.removeLast();
+            
+            final updatedContent = lines.isEmpty 
+                ? logLine 
+                : '${lines.join('\n')}\n$logLine';
+                
+            await sessionFile.writeAsString(updatedContent, mode: FileMode.write, flush: true);
+            return;
+          }
+        }
+      }
+    }
+
     await sessionFile.writeAsString(logLine, mode: FileMode.append, flush: true);
   } catch (e) {
-    // Preserve the original behavior of logging failures without throwing.
-    // This is safe for session logging because location updates can continue.
+    debugPrint('Error writing to session log: $e');
   }
 }
 
@@ -46,7 +77,6 @@ String formatDuration(Duration duration) {
 }
 
 Duration parseLogDuration(String input) {
-  // Regex matches: hours:minutes:seconds.microseconds
   final regExp = RegExp(r'^(\d+):(\d+):(\d+)\.(\d+)$');
   final match = regExp.firstMatch(input.trim());
   
@@ -56,7 +86,6 @@ Duration parseLogDuration(String input) {
     hours: int.parse(match[1]!),
     minutes: int.parse(match[2]!),
     seconds: int.parse(match[3]!),
-    // Truncate or pad microseconds to ensure it fits safely
     microseconds: int.parse(match[4]!.padRight(6, '0').substring(0, 6)),
   );
 }
@@ -71,4 +100,73 @@ Color getSpeedColor(double speedKmh) {
   } else {
     return Colors.red;
   }
+}
+
+List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segments = 8}) {
+  if (original.length < 4) return original;
+  
+  List<LoggedPosition> smoothed = [];
+
+  double getDistance(LoggedPosition a, LoggedPosition b) {
+    double dLat = b.location.latitude - a.location.latitude;
+    double dLng = b.location.longitude - a.location.longitude;
+    return math.sqrt(dLat * dLat + dLng * dLng);
+  }
+
+  const double alpha = 0.5;
+
+  for (int i = 0; i < original.length - 1; i++) {
+    var p0 = i == 0 ? original[i] : original[i - 1];
+    var p1 = original[i];
+    var p2 = original[i + 1];
+    var p3 = (i + 2 < original.length) ? original[i + 2] : p2;
+
+    double d01 = getDistance(p0, p1);
+    double d12 = getDistance(p1, p2);
+    double d23 = getDistance(p2, p3);
+
+    double t0 = 0.0;
+    double t1 = t0 + (d01 > 0 ? math.pow(d01, alpha) : 1.0);
+    double t2 = t1 + (d12 > 0 ? math.pow(d12, alpha) : 1.0);
+    double t3 = t2 + (d23 > 0 ? math.pow(d23, alpha) : 1.0);
+
+    for (int j = 0; j < segments; j++) {
+      double weight = j / segments;
+
+      double t = t1 + weight * (t2 - t1);
+
+      double a1Lat = (t1 - t) / (t1 - t0) * p0.location.latitude + (t - t0) / (t1 - t0) * p1.location.latitude;
+      double a1Lng = (t1 - t) / (t1 - t0) * p0.location.longitude + (t - t0) / (t1 - t0) * p1.location.longitude;
+      
+      double a2Lat = (t2 - t) / (t2 - t1) * p1.location.latitude + (t - t1) / (t2 - t1) * p2.location.latitude;
+      double a2Lng = (t2 - t) / (t2 - t1) * p1.location.longitude + (t - t1) / (t2 - t1) * p2.location.longitude;
+      
+      double a3Lat = (t3 - t) / (t3 - t2) * p2.location.latitude + (t - t2) / (t3 - t2) * p3.location.latitude;
+      double a3Lng = (t3 - t) / (t3 - t2) * p2.location.longitude + (t - t2) / (t3 - t2) * p3.location.longitude;
+
+      double b1Lat = (t2 - t) / (t2 - t0) * a1Lat + (t - t0) / (t2 - t0) * a2Lat;
+      double b1Lng = (t2 - t) / (t2 - t0) * a1Lng + (t - t0) / (t2 - t0) * a2Lng;
+      
+      double b2Lat = (t3 - t) / (t3 - t1) * a2Lat + (t - t1) / (t3 - t1) * a3Lat;
+      double b2Lng = (t3 - t) / (t3 - t1) * a2Lng + (t - t1) / (t3 - t1) * a3Lng;
+
+      double lat = (t2 - t) / (t2 - t1) * b1Lat + (t - t1) / (t2 - t1) * b2Lat;
+      double lng = (t2 - t) / (t2 - t1) * b1Lng + (t - t1) / (t2 - t1) * b2Lng;
+
+      double mixedSpeed = p1.speed + (p2.speed - p1.speed) * weight;
+
+      int p1Ms = p1.timestamp.inMilliseconds;
+      int p2Ms = p2.timestamp.inMilliseconds;
+      int mixedMs = p1Ms + ((p2Ms - p1Ms) * weight).round();
+
+      smoothed.add(LoggedPosition(
+        timestamp: Duration(milliseconds: mixedMs),
+        location: LatLng(lat, lng),
+        speed: mixedSpeed,
+      ));
+    }
+  }
+  
+  smoothed.add(original.last);
+  return smoothed;
 }
