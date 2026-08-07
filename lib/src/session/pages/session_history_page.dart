@@ -103,7 +103,7 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
       Duration activeDuration = Duration.zero;
 
       for (var i = 1; i < positions.length; i++) {
-        if (positions[i].speed > .277) {
+        if (positions[i].speed > .41666) {
           totalDistance += positions[i].speed * (i > 0 ? positions[i].timestamp.inSeconds - positions[i - 1].timestamp.inSeconds : 0);
           if (positions[i].speed > maxSpeedMps) {
             maxSpeedMps = positions[i].speed;

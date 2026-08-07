@@ -42,7 +42,10 @@ class _MyHomePageState extends State<MyHomePage> {
     _startLocationTracking();
   }
 
-  Future<void> _startNewSession() => homePageController.startNewSession();
+  Future<void> _startNewSession() async {
+    homePageController.sessionController.clearPath();
+    await homePageController.startNewSession();
+  }
 
   void _pauseResumeSession() => homePageController.pauseResumeSession();
 
@@ -87,6 +90,8 @@ class _MyHomePageState extends State<MyHomePage> {
       if (homePageController.sessionController.isPaused) return;
 
       homePageController.appendLocationToLog(position);
+      
+      homePageController.sessionController.addPoint(position);
     });
   }
 
@@ -147,18 +152,24 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget content() {
     return Stack(
       children: [
-        HomeMapView(
-          mapController: _mapController,
-          currentLocation: _currentLocation,
-          onCenterLocation: () {
-            setState(() {
-              _searchController.clear();
-              homePageController.searchController.searchSuggestions = [];
-            });
-            FocusScope.of(context).unfocus();
-            if (_currentLocation != null) {
-              _mapController.move(_currentLocation!, 15.0);
-            }
+        ValueListenableBuilder<List<LatLng>>(
+          valueListenable: homePageController.sessionController.sessionPathNotifier,
+          builder: (context, sessionPoints, child) {
+            return HomeMapView(
+              mapController: _mapController,
+              currentLocation: _currentLocation,
+              currentSessionPoints: sessionPoints, // Pass the live list here
+              onCenterLocation: () {
+                setState(() {
+                  _searchController.clear();
+                  homePageController.searchController.searchSuggestions = [];
+                });
+                FocusScope.of(context).unfocus();
+                if (_currentLocation != null) {
+                  _mapController.move(_currentLocation!, 15.0);
+                }
+              },
+            );
           },
         ),
         Positioned(

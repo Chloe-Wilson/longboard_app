@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../session/helpers/session_helpers.dart' as session_helpers;
 
@@ -117,5 +118,18 @@ class HomeSessionController {
   Future<void> appendLocationToLog(Position position) async {
     if (sessionFile == null) return;
     await session_helpers.appendLocationToLog(sessionFile!, position, sessionDuration);
+  }
+
+  final ValueNotifier<List<LatLng>> sessionPathNotifier = ValueNotifier([]);
+
+  void addPoint(Position position) {
+    final latLng = LatLng(position.latitude, position.longitude);
+    // Update the list and notify listeners
+    sessionPathNotifier.value = [...sessionPathNotifier.value, latLng];
+  }
+
+  // Clear path when session stops/starts fresh
+  void clearPath() {
+    sessionPathNotifier.value = [];
   }
 }

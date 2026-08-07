@@ -9,11 +9,13 @@ class HomeMapView extends StatelessWidget {
     required this.mapController,
     required this.currentLocation,
     required this.onCenterLocation,
+    required this.currentSessionPoints,
   });
 
   final MapController mapController;
   final LatLng? currentLocation;
   final VoidCallback onCenterLocation;
+  final List<LatLng> currentSessionPoints;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +38,18 @@ class HomeMapView extends StatelessWidget {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.cambion.longboard_app',
               ),
+              if (currentSessionPoints.isNotEmpty)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: currentSessionPoints,
+                      color: Colors.purple,
+                      strokeWidth: 4.0,
+                      strokeCap: StrokeCap.round,
+                      strokeJoin: StrokeJoin.round,
+                    ),
+                  ],
+                ),
               if (currentLocation != null)
                 MarkerLayer(
                   markers: [
