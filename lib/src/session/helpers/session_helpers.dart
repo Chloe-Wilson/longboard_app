@@ -28,12 +28,17 @@ Future<void> writeSessionHeader(File file, String sessionName, [String summary =
   }
 }
 
-Future<void> appendLocationToLog(File sessionFile, Position position, Duration sessionDuration) async {
+Future<void> appendLocationToLog(File sessionFile, Position position, Duration sessionDuration, [bool last = false]) async {
   final logLine = '$sessionDuration,${position.latitude},${position.longitude},${position.accuracy},${position.speed}\n';
 
   try {
     if (await sessionFile.exists()) {
       final lines = await sessionFile.readAsLines();
+      if (last && lines.length < 3) {
+        debugPrint('Not enough lines to remove the last one. Lines count: ${lines.length}');
+        await sessionFile.writeAsString(logLine, mode: FileMode.append, flush: true);
+        return;
+      }
 
       if (lines.isNotEmpty) {
         final segments = lines.last.split(',');

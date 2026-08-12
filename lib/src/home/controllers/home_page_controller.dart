@@ -112,7 +112,7 @@ class HomePageController {
     mapController.move(suggestion.location, suggestion.zoom);
   }
 
-  Future<void> appendLocationToLog(Position position) async {
-    await sessionController.appendLocationToLog(position);
+  Future<void> appendLocationToLog(Position position, [bool last = false]) async {
+    await sessionController.appendLocationToLog(position, last);
   }
 }

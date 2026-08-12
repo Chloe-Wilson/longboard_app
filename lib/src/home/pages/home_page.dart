@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_background/flutter_background.dart' as flutter_background hide AndroidResource;
+import 'package:permission_handler/permission_handler.dart';
 
 import '../controllers/home_page_controller.dart';
 import '../helpers/location_helpers.dart';
@@ -45,11 +47,13 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _startNewSession() async {
     homePageController.sessionController.clearPath();
     await homePageController.startNewSession();
+    _logGps();
   }
 
   void _pauseResumeSession() => homePageController.pauseResumeSession();
 
   Future<void> _stopSession() async {
+    _logGps(true);
     await homePageController.stopSession(context);
   }
 
@@ -80,56 +84,89 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  Future<void> _initBackgroundExecution() async {
+    final locationStatus = await Permission.location.request();
+    if (!locationStatus.isGranted) {
+      return Future.error('Foreground location permission denied');
+    }
 
-  void _startGpsLogging() {
-    _gpsLogTimer?.cancel();
-    _gpsLogTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final position = _latestPosition;
-      if (position == null) return;
-      if (!homePageController.sessionController.isSessionActive) return;
-      if (homePageController.sessionController.isPaused) return;
+    final backgroundLocationStatus = await Permission.locationAlways.request();
+    if (!backgroundLocationStatus.isGranted) {
+      return Future.error('Background location permissions are denied');
+    }
 
-      homePageController.appendLocationToLog(position);
-      
-      homePageController.sessionController.addPoint(position);
-    });
+    final androidConfig = flutter_background.FlutterBackgroundAndroidConfig(
+      notificationTitle: "GPS Logging Active",
+      notificationText: "Your session is recording in the background.",
+      enableWifiLock: true,
+    );
+    
+    bool initialized = await flutter_background.FlutterBackground.initialize(androidConfig: androidConfig);
+    if (initialized) {
+      await flutter_background.FlutterBackground.enableBackgroundExecution();
+    }
+  }
+
+  void _logGps([bool last = false]) {
+    final position = _latestPosition;
+    if (position == null) return;
+    if (!homePageController.sessionController.isSessionActive) return;
+    if (homePageController.sessionController.isPaused) return;
+
+    homePageController.appendLocationToLog(position, last);
+    
+    homePageController.sessionController.addPoint(position);
   }
 
   void _startLocationTracking() async {
-    try {
-      await checkLocationPermissions();
+  try {
+    // 1. Ensure you request 'Always' permission beforehand on Android 10+
+    await checkLocationPermissions(); 
+    await _initBackgroundExecution();
 
-      const LocationSettings locationSettings = LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 0,
-      );
+    // 2. Use AndroidSettings to configure foreground notification and wake behavior
+    final LocationSettings locationSettings = AndroidSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 0,
+      forceLocationManager: true, // Optional: helps reliability on certain devices
+      intervalDuration: const Duration(seconds: 5), // Tune as needed to save battery
+      foregroundNotificationConfig: const ForegroundNotificationConfig(
+        notificationTitle: "Location Tracking Active",
+        notificationText: "Your app is tracking location in the background.",
+        notificationChannelName: 'Location Tracking',
+        enableWakeLock: true, // Keeps CPU awake when screen locks
+      ),
+    );
 
-      _positionStreamSubscription = Geolocator.getPositionStream(
-        locationSettings: locationSettings,
-      ).listen((Position position) {
-        _latestPosition = position;
-        final newLocation = LatLng(position.latitude, position.longitude);
-        setState(() {
-          _currentLocation = newLocation;
-        });
-
-        if (!_hasFocusedOnLocation) {
-          _hasFocusedOnLocation = true;
-          _mapController.move(newLocation, 15.0);
-        }
-      }, onError: (error) {
-        debugPrint('Location stream error: $error');
+    _positionStreamSubscription = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen((Position position) {
+      _latestPosition = position;
+      final newLocation = LatLng(position.latitude, position.longitude);
+      _logGps();
+      
+      // Note: setState UI updates won't render visibly while the screen is locked, 
+      // but variables/logs/database updates will process continuously.
+      setState(() {
+        _currentLocation = newLocation;
       });
 
-      _startGpsLogging();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+      if (!_hasFocusedOnLocation) {
+        _hasFocusedOnLocation = true;
+        _mapController.move(newLocation, 15.0);
       }
+    }, onError: (error) {
+      debugPrint('Location stream error: $error');
+    });
+
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
     }
   }
+}
 
   @override
   void dispose() {

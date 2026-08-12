@@ -46,19 +46,20 @@ class HomeSessionController {
     sessionDurationNotifier.value = Duration.zero;
     _startSessionTimer();
 
-    unawaited(_createSessionFile(sessionName));
+    final file = await _createSessionFile(sessionName);
+    if (isSessionActive && currentSessionName == sessionName) {
+      sessionFile = file;
+    }
   }
 
-  Future<void> _createSessionFile(String sessionName) async {
+  Future<File> _createSessionFile(String sessionName) async {
     final directory = await getApplicationDocumentsDirectory();
     final file = File('${directory.path}/$sessionName');
     if (!await file.exists()) {
       await file.create(recursive: true);
     }
 
-    if (isSessionActive && currentSessionName == sessionName) {
-      sessionFile = file;
-    }
+    return file;
   }
 
   void pauseResumeSession() {
@@ -115,9 +116,9 @@ class HomeSessionController {
     sessionDurationNotifier.value = updatedDuration;
   }
 
-  Future<void> appendLocationToLog(Position position) async {
+  Future<void> appendLocationToLog(Position position, [bool last = false]) async {
     if (sessionFile == null) return;
-    await session_helpers.appendLocationToLog(sessionFile!, position, sessionDuration);
+    await session_helpers.appendLocationToLog(sessionFile!, position, sessionDuration, last);
   }
 
   final ValueNotifier<List<LatLng>> sessionPathNotifier = ValueNotifier([]);
