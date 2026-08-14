@@ -209,20 +209,20 @@ class _MyHomePageState extends State<MyHomePage> {
             );
           },
         ),
-        Positioned(
-          top: 80.0,
-          left: 16.0,
-          right: 16.0,
-          child: HomeSearchBar(
-            searchController: _searchController,
-            searchFocusNode: _searchFocusNode,
-            isSearchingLocation: homePageController.searchController.isSearchingLocation,
-            searchSuggestions: homePageController.searchController.searchSuggestions,
-            onSearchTextChanged: _onSearchTextChanged,
-            onSearchSubmitted: _searchAndMoveToLocation,
-            onSuggestionSelected: _selectSuggestion,
-          ),
-        ),
+        // Positioned(
+        //   top: 80.0,
+        //   left: 16.0,
+        //   right: 16.0,
+        //   child: HomeSearchBar(
+        //     searchController: _searchController,
+        //     searchFocusNode: _searchFocusNode,
+        //     isSearchingLocation: homePageController.searchController.isSearchingLocation,
+        //     searchSuggestions: homePageController.searchController.searchSuggestions,
+        //     onSearchTextChanged: _onSearchTextChanged,
+        //     onSearchSubmitted: _searchAndMoveToLocation,
+        //     onSuggestionSelected: _selectSuggestion,
+        //   ),
+        // ),
         HomeSessionControls(
           isSessionActive: homePageController.sessionController.isSessionActive,
           isPaused: homePageController.sessionController.isPaused,

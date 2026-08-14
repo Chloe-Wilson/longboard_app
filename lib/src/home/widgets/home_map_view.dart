@@ -3,6 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../helpers/color_scheme.dart';
+
 class HomeMapView extends StatelessWidget {
   const HomeMapView({
     super.key,
@@ -26,7 +28,8 @@ class HomeMapView extends StatelessWidget {
           onPointerDown: (_) => FocusScope.of(context).unfocus(),
           child: FlutterMap(
             mapController: mapController,
-            options: const MapOptions(
+            options: MapOptions(
+              backgroundColor: myColorScheme.surface,
               initialCenter: LatLng(0.0, 0.0),
               initialZoom: 1.5,
               interactionOptions: InteractionOptions(
@@ -36,6 +39,17 @@ class HomeMapView extends StatelessWidget {
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                tileBuilder: (context, tileWidget, tile) {
+                  return ColorFiltered(
+                    colorFilter: const ColorFilter.matrix(<double>[
+                      -0.2126, -0.7152, -0.0722, 0, 255,
+                      -0.2126, -0.7152, -0.0722, 0, 255,
+                      -0.2126, -0.7152, -0.0722, 0, 255,
+                      0,       0,       0,       1, 0,
+                    ]),
+                    child: tileWidget,
+                  );
+                },
                 userAgentPackageName: 'com.cambion.longboard_app',
               ),
               if (currentSessionPoints.isNotEmpty)
@@ -43,8 +57,10 @@ class HomeMapView extends StatelessWidget {
                   polylines: [
                     Polyline(
                       points: currentSessionPoints,
-                      color: Colors.purple,
+                      color: myColorScheme.onPrimary,
                       strokeWidth: 4.0,
+                      borderColor: myColorScheme.primary,
+                      borderStrokeWidth: 2.0,
                       strokeCap: StrokeCap.round,
                       strokeJoin: StrokeJoin.round,
                     ),
@@ -59,13 +75,13 @@ class HomeMapView extends StatelessWidget {
                       height: 40,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.purple.withAlpha(51),
+                          color: myColorScheme.primary.withAlpha(51),
                           shape: BoxShape.circle,
                         ),
-                        child: const Center(
+                        child: Center(
                           child: Icon(
                             Icons.location_history,
-                            color: Colors.purple,
+                            color: myColorScheme.primary,
                             size: 30,
                           ),
                         ),
@@ -89,8 +105,8 @@ class HomeMapView extends StatelessWidget {
           top: 152.0,
           child: FloatingActionButton(
             onPressed: onCenterLocation,
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.purple,
+            backgroundColor: myColorScheme.primary,
+            foregroundColor: myColorScheme.onPrimary,
             tooltip: 'Center on location',
             shape: const CircleBorder(),
             child: const Icon(Icons.my_location),

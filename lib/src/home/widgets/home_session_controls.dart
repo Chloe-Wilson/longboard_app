@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../helpers/color_scheme.dart';
+
 class HomeSessionControls extends StatelessWidget {
   const HomeSessionControls({
     super.key,
@@ -48,11 +50,11 @@ class HomeSessionControls extends StatelessWidget {
                       margin: const EdgeInsets.only(bottom: 12.0),
                       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 14.0),
                       decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(230),
+                        color: myColorScheme.primary,
                         borderRadius: BorderRadius.circular(20.0),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withAlpha(31),
+                            color: myColorScheme.surface.withAlpha(31),
                             blurRadius: 8.0,
                             offset: const Offset(0, 4),
                           ),
@@ -60,9 +62,10 @@ class HomeSessionControls extends StatelessWidget {
                       ),
                       child: Text(
                         'Session time: $durationText',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16.0,
                           fontWeight: FontWeight.w600,
+                          color: myColorScheme.onSurface,
                         ),
                       ),
                     );
@@ -79,7 +82,7 @@ class HomeSessionControls extends StatelessWidget {
                           shape: const CircleBorder(),
                           padding: const EdgeInsets.all(18.0),
                           backgroundColor: Colors.orange,
-                          foregroundColor: Colors.white,
+                          foregroundColor: myColorScheme.onPrimary,
                           elevation: 6,
                         ),
                         onPressed: onPauseResumeSession,
@@ -90,8 +93,8 @@ class HomeSessionControls extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       shape: const CircleBorder(),
                       padding: const EdgeInsets.all(20.0),
-                      backgroundColor: isSessionActive ? Colors.redAccent : Theme.of(context).colorScheme.primary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: isSessionActive ? Colors.redAccent : myColorScheme.primary,
+                      foregroundColor: myColorScheme.onPrimary,
                       elevation: 8,
                     ),
                     onPressed: isSessionActive ? onStopSession : onStartSession,
@@ -110,8 +113,8 @@ class HomeSessionControls extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 shape: const CircleBorder(),
                 padding: const EdgeInsets.all(16),
-                backgroundColor: Colors.blueGrey,
-                foregroundColor: Colors.white,
+                backgroundColor: myColorScheme.primary,
+                foregroundColor: myColorScheme.onPrimary,
                 elevation: 6,
               ),
               onPressed: onOpenSessionHistory,

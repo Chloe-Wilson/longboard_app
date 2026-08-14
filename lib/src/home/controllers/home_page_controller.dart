@@ -7,6 +7,7 @@ import 'home_search_controller.dart';
 import 'home_session_controller.dart';
 import '../../session/helpers/session_helpers.dart' as session_helpers;
 import '../helpers/search_helpers.dart' as search_helpers;
+import '../helpers/color_scheme.dart';
 
 typedef StateUpdater = void Function(void Function());
 
@@ -55,8 +56,19 @@ class HomePageController {
       builder: (context) {
         return AlertDialog(
           title: const Text('Name your session'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            side: BorderSide(
+              color: myColorScheme.primary,
+              width: 4.0,
+            ),
+          ),
           content: TextField(
             controller: controller,
+            style: TextStyle(
+              color: myColorScheme.onSurface,
+              fontSize: 16.0,
+            ),
             decoration: InputDecoration(
               labelText: 'Session name',
               hintText: fallbackName,
@@ -64,10 +76,16 @@ class HomePageController {
           ),
           actions: [
             TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: myColorScheme.primary,
+              ),
               onPressed: () => Navigator.of(context).pop(''),
               child: const Text('Skip'),
             ),
             TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: myColorScheme.primary,
+              ),
               onPressed: () => Navigator.of(context).pop(controller.text.trim()),
               child: const Text('Save'),
             ),

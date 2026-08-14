@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../session/helpers/session_helpers.dart' as session_helpers;
 import '../../session/models/logged_positions.dart';
+import '../../home/helpers/color_scheme.dart';
 
 class SessionDetailPage extends StatefulWidget {
   const SessionDetailPage({
@@ -84,6 +85,7 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
           return FlutterMap(
             mapController: _mapController,
             options: MapOptions(
+              backgroundColor: myColorScheme.surface,
               initialCenter: center,
               initialZoom: 15.0,
               interactionOptions: InteractionOptions(
@@ -93,7 +95,30 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                tileBuilder: (context, tileWidget, tile) {
+                  return ColorFiltered(
+                    colorFilter: const ColorFilter.matrix(<double>[
+                      -0.2126, -0.7152, -0.0722, 0, 255,
+                      -0.2126, -0.7152, -0.0722, 0, 255,
+                      -0.2126, -0.7152, -0.0722, 0, 255,
+                      0,       0,       0,       1, 0,
+                    ]),
+                    child: tileWidget,
+                  );
+                },
                 userAgentPackageName: 'com.cambion.longboard_app',
+              ),
+              PolylineLayer(
+                polylines: [
+                  for (var i = 1; i < smoothedPositions.length; i++)
+                    Polyline(
+                      points: [smoothedPositions[i - 1].location, smoothedPositions[i].location],
+                      color: myColorScheme.primary,
+                      strokeWidth: 6.0,
+                      strokeCap: StrokeCap.round,
+                      strokeJoin: StrokeJoin.round,
+                    ),
+                ],
               ),
               PolylineLayer(
                 polylines: [
