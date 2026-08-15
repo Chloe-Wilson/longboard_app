@@ -46,10 +46,12 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
         final timestamp = session_helpers.parseLogDuration(parts[0]);
         final latitude = double.parse(parts[1]);
         final longitude = double.parse(parts[2]);
+        final accuracy = double.parse(parts[3]);
         final speed = double.parse(parts[4]);
         positions.add(LoggedPosition(
           timestamp: timestamp,
           location: LatLng(latitude, longitude),
+          accuracy: accuracy,
           speed: speed,
         ));
       } catch (_) {

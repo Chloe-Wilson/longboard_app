@@ -109,26 +109,29 @@ Color getSpeedColor(double speed) {
 
 List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segments = 8}) {
   if (original.length < 4) return original;
+
+  List<LoggedPosition> filteredPositions = [];
+  for (int i = 0; i < original.length; i++) {
+    if (original[i].accuracy >= 15) continue;
+    if (filteredPositions.isNotEmpty) {
+      if (Geolocator.distanceBetween(original[i].location.latitude, original[i].location.longitude, filteredPositions[filteredPositions.length - 1].location.latitude, filteredPositions[filteredPositions.length - 1].location.longitude) < 5) continue;
+    };
+    filteredPositions.add(original[i]);
+  }
   
   List<LoggedPosition> smoothed = [];
 
-  double getDistance(LoggedPosition a, LoggedPosition b) {
-    double dLat = b.location.latitude - a.location.latitude;
-    double dLng = b.location.longitude - a.location.longitude;
-    return math.sqrt(dLat * dLat + dLng * dLng);
-  }
-
   const double alpha = 0.5;
 
-  for (int i = 0; i < original.length - 1; i++) {
-    var p0 = i == 0 ? original[i] : original[i - 1];
-    var p1 = original[i];
-    var p2 = original[i + 1];
-    var p3 = (i + 2 < original.length) ? original[i + 2] : p2;
+  for (int i = 0; i < filteredPositions.length - 1; i++) {
+    var p0 = i == 0 ? filteredPositions[i] : filteredPositions[i - 1];
+    var p1 = filteredPositions[i];
+    var p2 = filteredPositions[i + 1];
+    var p3 = (i + 2 < filteredPositions.length) ? filteredPositions[i + 2] : p2;
 
-    double d01 = getDistance(p0, p1);
-    double d12 = getDistance(p1, p2);
-    double d23 = getDistance(p2, p3);
+    double d01 = Geolocator.distanceBetween(p0.location.latitude, p0.location.longitude, p1.location.latitude, p1.location.longitude);
+    double d12 = Geolocator.distanceBetween(p1.location.latitude, p1.location.longitude, p2.location.latitude, p2.location.longitude);
+    double d23 = Geolocator.distanceBetween(p2.location.latitude, p2.location.longitude, p3.location.latitude, p3.location.longitude);
 
     double t0 = 0.0;
     double t1 = t0 + (d01 > 0 ? math.pow(d01, alpha) : 1.0);
@@ -158,7 +161,8 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
       double lat = (t2 - t) / (t2 - t1) * b1Lat + (t - t1) / (t2 - t1) * b2Lat;
       double lng = (t2 - t) / (t2 - t1) * b1Lng + (t - t1) / (t2 - t1) * b2Lng;
 
-      double mixedSpeed = p1.speed + (p2.speed - p1.speed) * weight;
+      // double mixedSpeed = p1.speed + (p2.speed - p1.speed) * weight;
+      double mixedSpeed = Geolocator.distanceBetween(p1.location.latitude, p1.location.longitude, p2.location.latitude, p2.location.longitude) / (p2.timestamp.inSeconds - p1.timestamp.inSeconds);
 
       int p1Ms = p1.timestamp.inMilliseconds;
       int p2Ms = p2.timestamp.inMilliseconds;
@@ -167,6 +171,7 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
       smoothed.add(LoggedPosition(
         timestamp: Duration(milliseconds: mixedMs),
         location: LatLng(lat, lng),
+        accuracy: 0,
         speed: mixedSpeed,
       ));
     }

@@ -110,6 +110,7 @@ class HomeMapView extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 FloatingActionButton(
+                  heroTag: 'settings',
                   onPressed: () {
                     showDialog<String>(
                       context: context,
@@ -136,6 +137,7 @@ class HomeMapView extends StatelessWidget {
                 ),
                 const SizedBox(height: 16.0),
                 FloatingActionButton(
+                  heroTag: 'center_location',
                   onPressed: onCenterLocation,
                   backgroundColor: myColorScheme.primary,
                   foregroundColor: myColorScheme.onPrimary,
