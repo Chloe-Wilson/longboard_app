@@ -9,9 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../controllers/home_page_controller.dart';
 import '../helpers/location_helpers.dart';
-import '../helpers/search_helpers.dart';
 import '../widgets/home_map_view.dart';
-import '../widgets/home_search_bar.dart';
 import '../widgets/home_session_controls.dart';
 import '../../session/pages/session_history_page.dart';
 
@@ -60,27 +58,6 @@ class _MyHomePageState extends State<MyHomePage> {
   void _openSessionHistoryPage() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => const SessionHistoryPage()),
-    );
-  }
-
-  Future<void> _searchAndMoveToLocation() async {
-    await homePageController.searchAndMoveToLocation(
-      _searchController.text,
-      _currentLocation,
-      _mapController,
-    );
-  }
-
-  void _onSearchTextChanged(String query) {
-    homePageController.onSearchTextChanged(query);
-  }
-
-  void _selectSuggestion(SearchSuggestion suggestion) {
-    homePageController.selectSuggestion(
-      suggestion,
-      _searchController,
-      _searchFocusNode,
-      _mapController,
     );
   }
 
@@ -145,8 +122,6 @@ class _MyHomePageState extends State<MyHomePage> {
       final newLocation = LatLng(position.latitude, position.longitude);
       _logGps();
       
-      // Note: setState UI updates won't render visibly while the screen is locked, 
-      // but variables/logs/database updates will process continuously.
       setState(() {
         _currentLocation = newLocation;
       });
@@ -209,20 +184,6 @@ class _MyHomePageState extends State<MyHomePage> {
             );
           },
         ),
-        // Positioned(
-        //   top: 80.0,
-        //   left: 16.0,
-        //   right: 16.0,
-        //   child: HomeSearchBar(
-        //     searchController: _searchController,
-        //     searchFocusNode: _searchFocusNode,
-        //     isSearchingLocation: homePageController.searchController.isSearchingLocation,
-        //     searchSuggestions: homePageController.searchController.searchSuggestions,
-        //     onSearchTextChanged: _onSearchTextChanged,
-        //     onSearchSubmitted: _searchAndMoveToLocation,
-        //     onSuggestionSelected: _selectSuggestion,
-        //   ),
-        // ),
         HomeSessionControls(
           isSessionActive: homePageController.sessionController.isSessionActive,
           isPaused: homePageController.sessionController.isPaused,

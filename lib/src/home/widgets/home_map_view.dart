@@ -90,6 +90,7 @@ class HomeMapView extends StatelessWidget {
                   ],
                 ),
               RichAttributionWidget(
+                alignment: AttributionAlignment.bottomLeft,
                 attributions: [
                   TextSourceAttribution(
                     'OpenStreetMap contributors',
@@ -100,16 +101,50 @@ class HomeMapView extends StatelessWidget {
             ],
           ),
         ),
-        Positioned(
-          right: 16.0,
-          top: 152.0,
-          child: FloatingActionButton(
-            onPressed: onCenterLocation,
-            backgroundColor: myColorScheme.primary,
-            foregroundColor: myColorScheme.onPrimary,
-            tooltip: 'Center on location',
-            shape: const CircleBorder(),
-            child: const Icon(Icons.my_location),
+        Align(
+          alignment: Alignment.topRight,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 24.0, top: 50.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton(
+                  onPressed: () {
+                    showDialog<String>(
+                      context: context,
+                      builder: (context) {
+                        return AlertDialog(
+                          title: const Text('Settings'),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.0),
+                            side: BorderSide(
+                              color: myColorScheme.primary,
+                              width: 4.0,
+                            ),
+                          ),
+                          
+                        );
+                      },
+                    );
+                  },
+                  backgroundColor: myColorScheme.primary,
+                  foregroundColor: myColorScheme.onPrimary,
+                  tooltip: 'Settings',
+                  shape: const CircleBorder(),
+                  child: const Icon(Icons.settings),
+                ),
+                const SizedBox(height: 16.0),
+                FloatingActionButton(
+                  onPressed: onCenterLocation,
+                  backgroundColor: myColorScheme.primary,
+                  foregroundColor: myColorScheme.onPrimary,
+                  tooltip: 'Center on location',
+                  shape: const CircleBorder(),
+                  child: const Icon(Icons.my_location),
+                ),
+              ]
+            ),
           ),
         ),
       ],
