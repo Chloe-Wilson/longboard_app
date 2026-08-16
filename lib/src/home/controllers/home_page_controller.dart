@@ -37,10 +37,17 @@ class HomePageController {
 
     final defaultSessionName = _defaultSessionName();
     final enteredName = await _promptSessionName(context, defaultSessionName);
-    final sessionName = enteredName.isNotEmpty ? enteredName : defaultSessionName;
+    if (enteredName == 'Delete') {
+      if (sessionFile != null && await sessionFile.exists()) {
+        await sessionFile.delete();
+      }
+      return;
+    } else {
+      final sessionName = enteredName.isNotEmpty ? enteredName : defaultSessionName;
 
-    if (sessionFile != null) {
-      session_helpers.writeSessionHeader(sessionFile, sessionName);
+      if (sessionFile != null) {
+        session_helpers.writeSessionHeader(sessionFile, sessionName);
+      }
     }
   }
 
@@ -79,8 +86,8 @@ class HomePageController {
               style: TextButton.styleFrom(
                 foregroundColor: myColorScheme.primary,
               ),
-              onPressed: () => Navigator.of(context).pop(''),
-              child: const Text('Skip'),
+              onPressed: () => Navigator.of(context).pop('Delete'),
+              child: const Text('Delete'),
             ),
             TextButton(
               style: TextButton.styleFrom(
