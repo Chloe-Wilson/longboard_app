@@ -214,6 +214,7 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
             return const Center(child: Text('No past sessions found.'));
           }
           return ListView.separated(
+            physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.all(16.0),
             itemCount: sessions.length,
             separatorBuilder: (_, _) => const SizedBox(height: 12.0),
