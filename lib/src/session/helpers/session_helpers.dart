@@ -114,9 +114,28 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
   for (int i = 0; i < original.length; i++) {
     if (original[i].accuracy >= 15) continue;
     if (filteredPositions.isNotEmpty) {
-      if (Geolocator.distanceBetween(original[i].location.latitude, original[i].location.longitude, filteredPositions[filteredPositions.length - 1].location.latitude, filteredPositions[filteredPositions.length - 1].location.longitude) < 5) continue;
+      final dist = Geolocator.distanceBetween(
+        original[i].location.latitude,
+        original[i].location.longitude,
+        filteredPositions[filteredPositions.length - 1].location.latitude,
+        filteredPositions[filteredPositions.length - 1].location.longitude,
+      );
+      if (dist < 5) continue;
     }
-    filteredPositions.add(original[i]);
+    final timeDeltaSeconds = i > 0 ? original[i].timestamp.inSeconds - original[i - 1].timestamp.inSeconds : 0;
+    final speed = original[i].speed > 1 ? original[i].speed : (filteredPositions.isNotEmpty ? Geolocator.distanceBetween(
+      filteredPositions[filteredPositions.length - 1].location.latitude,
+      filteredPositions[filteredPositions.length - 1].location.longitude,
+      original[i].location.latitude,
+      original[i].location.longitude,
+    ) / timeDeltaSeconds : 0.0);
+    filteredPositions.add(LoggedPosition(
+        timestamp: original[i].timestamp,
+        location: original[i].location,
+        accuracy: original[i].accuracy,
+        speed: 1 > original[i].speed ? speed : original[i].speed,
+      )
+    );
   }
   
   List<LoggedPosition> smoothed = [];
@@ -161,8 +180,8 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
       double lat = (t2 - t) / (t2 - t1) * b1Lat + (t - t1) / (t2 - t1) * b2Lat;
       double lng = (t2 - t) / (t2 - t1) * b1Lng + (t - t1) / (t2 - t1) * b2Lng;
 
-      // double mixedSpeed = p1.speed + (p2.speed - p1.speed) * weight;
-      double mixedSpeed = Geolocator.distanceBetween(p1.location.latitude, p1.location.longitude, p2.location.latitude, p2.location.longitude) / (p2.timestamp.inSeconds - p1.timestamp.inSeconds);
+      double mixedSpeed = p1.speed + (p2.speed - p1.speed) * weight;
+      // double mixedSpeed = Geolocator.distanceBetween(p1.location.latitude, p1.location.longitude, p2.location.latitude, p2.location.longitude) / (p2.timestamp.inSeconds - p1.timestamp.inSeconds);
 
       int p1Ms = p1.timestamp.inMilliseconds;
       int p2Ms = p2.timestamp.inMilliseconds;

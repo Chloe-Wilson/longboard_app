@@ -82,7 +82,7 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
           }
 
           final center = positions.first.location;
-          final smoothedPositions = session_helpers.smoothPositions(positions, segments: 8);
+          final smoothedPositions = session_helpers.smoothPositions(positions, segments: 2);
 
           return FlutterMap(
             mapController: _mapController,
