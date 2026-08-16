@@ -105,15 +105,15 @@ class _MyHomePageState extends State<MyHomePage> {
 
     // 2. Use AndroidSettings to configure foreground notification and wake behavior
     final LocationSettings locationSettings = AndroidSettings(
-      accuracy: LocationAccuracy.high,
+      accuracy: LocationAccuracy.bestForNavigation,
       distanceFilter: 0,
-      forceLocationManager: true, // Optional: helps reliability on certain devices
-      intervalDuration: const Duration(seconds: 5), // Tune as needed to save battery
+      forceLocationManager: false,
+      intervalDuration: const Duration(seconds: 1),
       foregroundNotificationConfig: const ForegroundNotificationConfig(
         notificationTitle: "Location Tracking Active",
         notificationText: "Your app is tracking location in the background.",
         notificationChannelName: 'Location Tracking',
-        enableWakeLock: true, // Keeps CPU awake when screen locks
+        enableWakeLock: true,
       ),
     );
 

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'session_detail_page.dart';
@@ -64,6 +65,17 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
         final longitude = double.parse(parts[2]);
         final accuracy = double.parse(parts[3]);
         final speed = double.parse(parts[4]);
+        if (accuracy >= 15) continue;
+        if (positions.isNotEmpty) {
+          if (Geolocator.distanceBetween(
+                latitude,
+                longitude,
+                positions.last.location.latitude,
+                positions.last.location.longitude,
+              ) < 5) {
+            continue;
+          }
+        }
         positions.add(LoggedPosition(
           timestamp: timestamp,
           location: LatLng(latitude, longitude),
@@ -89,11 +101,9 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
         file: file,
         sessionName: sessionName,
         totalDuration: session_helpers.parseLogDuration(summary[0]),
-        activeDuration: session_helpers.parseLogDuration(summary[1]),
-        restDuration: session_helpers.parseLogDuration(summary[2]),
-        distanceMeters: double.parse(summary[3]),
-        averageSpeedKmh: double.parse(summary[4]),
-        maxSpeedKmh: double.parse(summary[5]),
+        distanceMeters: double.parse(summary[1]),
+        averageSpeedKmh: double.parse(summary[2]),
+        maxSpeedKmh: double.parse(summary[3]),
       );
     } else {
       final duration = positions.length >= 2
@@ -102,32 +112,32 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
 
       double totalDistance = 0.0;
       double maxSpeedMps = 0.0;
-      Duration activeDuration = Duration.zero;
 
       for (var i = 1; i < positions.length; i++) {
-        if (positions[i].speed > .41666) {
-          totalDistance += positions[i].speed * (i > 0 ? positions[i].timestamp.inSeconds - positions[i - 1].timestamp.inSeconds : 0);
-          if (positions[i].speed > maxSpeedMps) {
-            maxSpeedMps = positions[i].speed;
-          }
-          activeDuration += positions[i].timestamp - positions[i - 1].timestamp;
-        }
+        final timeDeltaSeconds = positions[i].timestamp.inSeconds - positions[i - 1].timestamp.inSeconds;
+        if (timeDeltaSeconds <= 0) continue;
         
+        final distance = Geolocator.distanceBetween(
+          positions[i - 1].location.latitude,
+          positions[i - 1].location.longitude,
+          positions[i].location.latitude,
+          positions[i].location.longitude,
+        );
+        distance > 0 ? totalDistance += distance : null;
+        maxSpeedMps = positions[i].speed > maxSpeedMps ? positions[i].speed : maxSpeedMps;
       }
 
-      final averageSpeedKmh = activeDuration.inSeconds > 0
-          ? (totalDistance / activeDuration.inSeconds) * 3.6
+      final averageSpeedKmh = duration.inSeconds > 0
+          ? (totalDistance / duration.inSeconds) * 3.6
           : 0.0;
       final maxSpeedKmh = maxSpeedMps * 3.6;
 
-      session_helpers.writeSessionHeader(file, sessionName, '$duration,$activeDuration,${duration - activeDuration},$totalDistance,$averageSpeedKmh,$maxSpeedKmh');
+      session_helpers.writeSessionHeader(file, sessionName, '$duration,$totalDistance,$averageSpeedKmh,$maxSpeedKmh');
 
       return _SessionSummary(
         file: file,
         sessionName: sessionName,
         totalDuration: duration,
-        activeDuration: activeDuration,
-        restDuration: duration - activeDuration,
         distanceMeters: totalDistance,
         averageSpeedKmh: averageSpeedKmh,
         maxSpeedKmh: maxSpeedKmh,
@@ -255,8 +265,6 @@ class _SessionSummary {
     required this.file,
     required this.sessionName,
     required this.totalDuration,
-    required this.activeDuration,
-    required this.restDuration,
     required this.distanceMeters,
     required this.averageSpeedKmh,
     required this.maxSpeedKmh,
@@ -265,8 +273,6 @@ class _SessionSummary {
   final File file;
   final String sessionName;
   final Duration totalDuration;
-  final Duration activeDuration;
-  final Duration restDuration;
   final double distanceMeters;
   final double averageSpeedKmh;
   final double maxSpeedKmh;

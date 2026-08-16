@@ -115,7 +115,7 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
     if (original[i].accuracy >= 15) continue;
     if (filteredPositions.isNotEmpty) {
       if (Geolocator.distanceBetween(original[i].location.latitude, original[i].location.longitude, filteredPositions[filteredPositions.length - 1].location.latitude, filteredPositions[filteredPositions.length - 1].location.longitude) < 5) continue;
-    };
+    }
     filteredPositions.add(original[i]);
   }
   
