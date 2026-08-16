@@ -44,6 +44,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _startNewSession() async {
     homePageController.sessionController.clearPath();
+    await _initBackgroundExecution();
     await homePageController.startNewSession();
     _logGps();
   }
@@ -53,6 +54,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _stopSession() async {
     _logGps(true);
     await homePageController.stopSession(context);
+    await flutter_background.FlutterBackground.disableBackgroundExecution();
   }
 
   void _openSessionHistoryPage() {
@@ -99,7 +101,7 @@ class _MyHomePageState extends State<MyHomePage> {
   try {
     // 1. Ensure you request 'Always' permission beforehand on Android 10+
     await checkLocationPermissions(); 
-    await _initBackgroundExecution();
+    
 
     // 2. Use AndroidSettings to configure foreground notification and wake behavior
     final LocationSettings locationSettings = AndroidSettings(

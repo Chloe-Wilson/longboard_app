@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:flutter_background/flutter_background.dart' as flutter_background hide AndroidResource;
 
 import '../../session/helpers/session_helpers.dart' as session_helpers;
 
@@ -62,13 +63,15 @@ class HomeSessionController {
     return file;
   }
 
-  void pauseResumeSession() {
+  Future<void> pauseResumeSession() async {
     if (!isSessionActive) return;
 
     if (isPaused) {
+      await flutter_background.FlutterBackground.enableBackgroundExecution();
       sessionResumeTime = DateTime.now();
       _startSessionTimer();
     } else {
+      await flutter_background.FlutterBackground.disableBackgroundExecution();
       if (sessionResumeTime != null) {
         sessionAccumulatedDuration += DateTime.now().difference(sessionResumeTime!);
         sessionResumeTime = null;
