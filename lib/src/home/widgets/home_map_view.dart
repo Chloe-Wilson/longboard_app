@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
 
 import '../helpers/color_scheme.dart';
+import 'settings_provider.dart';
 
 class HomeMapView extends StatelessWidget {
   const HomeMapView({
@@ -112,19 +114,66 @@ class HomeMapView extends StatelessWidget {
                 FloatingActionButton(
                   heroTag: 'settings',
                   onPressed: () {
-                    showDialog<String>(
+                    final settingsNotifier = context.read<SettingsNotifier>();
+                    final settings = settingsNotifier.settings;
+
+                    // Create controllers pre-filled with current values
+                    final controllers = <String, TextEditingController>{};
+                    settings.forEach((key, value) {
+                      controllers[key] = TextEditingController(text: value.toString());
+                    });
+
+                    showDialog<void>(
                       context: context,
-                      builder: (context) {
+                      builder: (dialogContext) {
                         return AlertDialog(
                           title: const Text('Settings'),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12.0),
                             side: BorderSide(
-                              color: myColorScheme.primary,
+                              color: Theme.of(context).colorScheme.primary,
                               width: 4.0,
                             ),
                           ),
-                          
+                          content: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: settings.keys.map((key) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 6.0),
+                                  child: TextField(
+                                    controller: controllers[key],
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      labelText: key,
+                                      border: const OutlineInputBorder(),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dialogContext),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () async {
+                                // Save updated values to file & state
+                                for (var key in controllers.keys) {
+                                  final newValue = int.tryParse(controllers[key]!.text);
+                                  if (newValue != null) {
+                                    await settingsNotifier.updateSetting(key, newValue);
+                                  }
+                                }
+                                if (dialogContext.mounted) {
+                                  Navigator.pop(dialogContext);
+                                }
+                              },
+                              child: const Text('Save'),
+                            ),
+                          ],
                         );
                       },
                     );

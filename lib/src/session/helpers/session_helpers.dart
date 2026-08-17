@@ -95,15 +95,26 @@ Duration parseLogDuration(String input) {
   );
 }
 
-Color getSpeedColor(double speed) {
-  if (speed < 2.777) {
+Color getSpeedColor(double speed, Map<String, dynamic> settings) {
+  final green = (settings['Green'] ?? 10).toDouble()/3.6;
+  final yellow = (settings['Yellow'] ?? 15).toDouble()/3.6;
+  final orange = (settings['Orange'] ?? 20).toDouble()/3.6;
+  final red = (settings['Red'] ?? 25).toDouble()/3.6;
+  final blue = (settings['Blue'] ?? 30).toDouble()/3.6;
+  final purple = (settings['Purple'] ?? 35).toDouble()/3.6;
+
+  if (speed < green) {
     return Color.fromRGBO(0, 255, 0, 1.0);
-  } else if (speed < 4.166) {
-    return Color.fromRGBO((255*(speed-2.777)/1.388).toInt().clamp(0, 255), 255, 0, 1.0);
-  } else if (speed < 5.555) {
-    return Color.fromRGBO(255, (255-90*(speed-4.166)/1.388).toInt().clamp(165, 255), 0, 1.0);
+  } else if (speed < yellow) {
+    return Color.fromRGBO((255*(speed-green)/(yellow-green)).toInt().clamp(0, 255), 255, 0, 1.0);
+  } else if (speed < orange) {
+    return Color.fromRGBO(255, (255-90*(speed-yellow)/(orange-yellow)).toInt().clamp(165, 255), 0, 1.0);
+  } else if (speed < red) {
+    return Color.fromRGBO(255, (165-165*(speed-orange)/(red-orange)).toInt().clamp(0, 165), 0, 1.0);
+  } else if (speed < blue) {
+    return Color.fromRGBO((255-255*(speed-red)/(blue-red)).toInt().clamp(0, 255), 0, (255*(speed-red)/(blue-red)).toInt().clamp(0, 255), 1.0);
   } else {
-    return Color.fromRGBO(255, (165-165*(speed-5.555)/1.388).toInt().clamp(0, 165), 0, 1.0);
+    return Color.fromRGBO((153*(speed-blue)/(purple-blue)).toInt().clamp(0, 153), (51*(speed-blue)/(purple-blue)).toInt().clamp(0, 51), 255, 1.0);
   }
 }
 

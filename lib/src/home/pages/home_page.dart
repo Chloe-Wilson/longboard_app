@@ -1,11 +1,13 @@
 import 'dart:async';
 
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_background/flutter_background.dart' as flutter_background hide AndroidResource;
 import 'package:permission_handler/permission_handler.dart';
+
 
 import '../controllers/home_page_controller.dart';
 import '../helpers/location_helpers.dart';
@@ -86,6 +88,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+
   void _logGps([bool last = false]) {
     final position = _latestPosition;
     if (position == null) return;
@@ -99,11 +102,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _startLocationTracking() async {
   try {
-    // 1. Ensure you request 'Always' permission beforehand on Android 10+
     await checkLocationPermissions(); 
     
-
-    // 2. Use AndroidSettings to configure foreground notification and wake behavior
     final LocationSettings locationSettings = AndroidSettings(
       accuracy: LocationAccuracy.bestForNavigation,
       distanceFilter: 0,

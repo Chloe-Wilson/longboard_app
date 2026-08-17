@@ -3,10 +3,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
 
 import '../../session/helpers/session_helpers.dart' as session_helpers;
 import '../../session/models/logged_positions.dart';
 import '../../home/helpers/color_scheme.dart';
+import '../../home/widgets/settings_provider.dart';
 
 class SessionDetailPage extends StatefulWidget {
   const SessionDetailPage({
@@ -128,8 +130,8 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
                     Polyline(
                       points: [smoothedPositions[i - 1].location, smoothedPositions[i].location],
                       gradientColors: [
-                        session_helpers.getSpeedColor(smoothedPositions[i - 1].speed),
-                        session_helpers.getSpeedColor(smoothedPositions[i].speed),
+                        session_helpers.getSpeedColor(smoothedPositions[i - 1].speed, context.watch<SettingsNotifier>().settings),
+                        session_helpers.getSpeedColor(smoothedPositions[i].speed, context.watch<SettingsNotifier>().settings),
                       ],
                       strokeWidth: 4.0,
                       strokeCap: StrokeCap.round,
