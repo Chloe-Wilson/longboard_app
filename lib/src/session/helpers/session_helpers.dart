@@ -144,7 +144,7 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
         timestamp: original[i].timestamp,
         location: original[i].location,
         accuracy: original[i].accuracy,
-        speed: 1 > original[i].speed ? speed : original[i].speed,
+        speed: original[i].speed,
       )
     );
   }
