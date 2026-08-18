@@ -1,4 +1,4 @@
-package com.cambion.longboard_app
+package com.CambionStudios.carve
 
 import io.flutter.embedding.android.FlutterActivity
 

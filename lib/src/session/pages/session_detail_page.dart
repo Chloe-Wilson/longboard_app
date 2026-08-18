@@ -110,7 +110,7 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
                     child: tileWidget,
                   );
                 },
-                userAgentPackageName: 'com.cambion.longboard_app',
+                userAgentPackageName: 'com.CambionStudios.carve',
               ),
               PolylineLayer(
                 polylines: [

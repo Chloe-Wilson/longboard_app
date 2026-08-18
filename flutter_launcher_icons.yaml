@@ -1,0 +1,9 @@
+# flutter pub run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/CarveIconForeground.png" # Standard fallback / iOS
+  
+  # Adaptive Icon Config for Android
+  adaptive_icon_background: "#000000" # Or point to "assets/icon/background.png"
+  adaptive_icon_foreground: "assets/icon/CarveIconForeground.png"

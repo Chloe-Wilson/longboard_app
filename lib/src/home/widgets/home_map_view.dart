@@ -52,7 +52,7 @@ class HomeMapView extends StatelessWidget {
                     child: tileWidget,
                   );
                 },
-                userAgentPackageName: 'com.cambion.longboard_app',
+                userAgentPackageName: 'com.CambionStudios.carve',
               ),
               if (currentSessionPoints.isNotEmpty)
                 PolylineLayer(
