@@ -210,3 +210,38 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
   smoothed.add(original.last);
   return smoothed;
 }
+
+double calculateDistanceFromLastPoint(File sessionFile, Position position) {
+  try {
+    if (!sessionFile.existsSync()) return 0.0;
+
+    final lines = sessionFile.readAsLinesSync();
+    if (lines.isEmpty) return 0.0;
+
+    final lastLine = lines.last;
+    if (lastLine.startsWith("#")) return 0.0;
+    final segments = lastLine.split(',');
+
+    if (segments.length < 3) return 0.0;
+
+    final accuracy = double.tryParse(segments[3]);
+    if (accuracy! >= 15) return 0.0;
+
+    final lastLatitude = double.tryParse(segments[1]);
+    final lastLongitude = double.tryParse(segments[2]);
+
+    if (lastLatitude == null || lastLongitude == null) return 0.0;
+
+    final distance = Geolocator.distanceBetween(
+      lastLatitude,
+      lastLongitude,
+      position.latitude,
+      position.longitude,
+    );
+
+    return 5 > distance ? 0.0 : distance;
+  } catch (e) {
+    debugPrint('Error calculating distance from last point: $e');
+    return 0.0;
+  }
+}

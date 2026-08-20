@@ -190,6 +190,7 @@ class _MyHomePageState extends State<MyHomePage> {
           isSessionActive: homePageController.sessionController.isSessionActive,
           isPaused: homePageController.sessionController.isPaused,
           sessionDurationListenable: homePageController.sessionController.sessionDurationNotifier,
+          sessionDistanceListenable: homePageController.sessionController.sessionDistanceNotifier,
           onStartSession: _startNewSession,
           onStopSession: _stopSession,
           onPauseResumeSession: _pauseResumeSession,

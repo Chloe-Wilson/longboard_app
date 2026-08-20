@@ -9,6 +9,7 @@ class HomeSessionControls extends StatelessWidget {
     required this.isSessionActive,
     required this.isPaused,
     required this.sessionDurationListenable,
+    required this.sessionDistanceListenable,
     required this.onStartSession,
     required this.onStopSession,
     required this.onPauseResumeSession,
@@ -18,6 +19,7 @@ class HomeSessionControls extends StatelessWidget {
   final bool isSessionActive;
   final bool isPaused;
   final ValueListenable<Duration> sessionDurationListenable;
+  final ValueListenable<double> sessionDistanceListenable;
   final VoidCallback onStartSession;
   final VoidCallback onStopSession;
   final VoidCallback onPauseResumeSession;
@@ -45,6 +47,7 @@ class HomeSessionControls extends StatelessWidget {
                     final minutesPart = '${minutes.toString().padLeft(2, '0')}:';
                     final secondsPart = seconds.toString().padLeft(2, '0');
                     final durationText = '$hoursPart$minutesPart$secondsPart';
+                    final distanceText = '${(sessionDistanceListenable.value / 1000).toStringAsFixed(2)} km';
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12.0),
@@ -61,7 +64,9 @@ class HomeSessionControls extends StatelessWidget {
                         ],
                       ),
                       child: Text(
-                        'Session time: $durationText',
+                        'Session time: $durationText\nDistance: $distanceText',
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
                         style: TextStyle(
                           fontSize: 16.0,
                           fontWeight: FontWeight.w600,

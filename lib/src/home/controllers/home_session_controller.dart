@@ -22,6 +22,7 @@ class HomeSessionController {
   String? currentSessionName;
   Duration sessionDuration = Duration.zero;
   final ValueNotifier<Duration> sessionDurationNotifier = ValueNotifier(Duration.zero);
+  final ValueNotifier<double> sessionDistanceNotifier = ValueNotifier(0.0);
   Duration sessionAccumulatedDuration = Duration.zero;
   DateTime? sessionResumeTime;
   Timer? _sessionTimer;
@@ -29,6 +30,7 @@ class HomeSessionController {
   void dispose() {
     _sessionTimer?.cancel();
     sessionDurationNotifier.dispose();
+    sessionDistanceNotifier.dispose();
   }
 
   Future<void> startNewSession() async {
@@ -45,6 +47,7 @@ class HomeSessionController {
       sessionResumeTime = DateTime.now();
     });
     sessionDurationNotifier.value = Duration.zero;
+    sessionDistanceNotifier.value = 0.0;
     _startSessionTimer();
 
     final file = await _createSessionFile(sessionName);
@@ -96,6 +99,7 @@ class HomeSessionController {
       sessionResumeTime = null;
     });
     sessionDurationNotifier.value = Duration.zero;
+    sessionDistanceNotifier.value = 0.0;
   }
 
   void _startSessionTimer() {
@@ -121,6 +125,7 @@ class HomeSessionController {
 
   Future<void> appendLocationToLog(Position position, [bool last = false]) async {
     if (sessionFile == null) return;
+    sessionDistanceNotifier.value += session_helpers.calculateDistanceFromLastPoint(sessionFile!, position);
     await session_helpers.appendLocationToLog(sessionFile!, position, sessionDuration, last);
   }
 
