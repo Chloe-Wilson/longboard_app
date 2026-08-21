@@ -122,7 +122,8 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
   if (original.length < 4) return original;
 
   List<LoggedPosition> filteredPositions = [];
-  for (int i = 0; i < original.length; i++) {
+  filteredPositions.add(original.first);
+  for (int i = 1; i < original.length - 1; i++) {
     if (original[i].accuracy >= 15) continue;
     if (filteredPositions.isNotEmpty) {
       final dist = Geolocator.distanceBetween(
@@ -148,67 +149,39 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
       )
     );
   }
-  
-  List<LoggedPosition> smoothed = [];
+  filteredPositions.add(original.last);
 
-  const double alpha = 0.5;
+  List<LoggedPosition> weightedPoints = [];
+  weightedPoints.add(filteredPositions.first);
+  for (int i = 3; i < filteredPositions.length - 3; i++) {
+    final prev3 = filteredPositions[i - 3];
+    final prev2 = filteredPositions[i - 2];
+    final prev = filteredPositions[i - 1];
+    final curr = filteredPositions[i];
+    final next = filteredPositions[i + 1];
+    final next2 = filteredPositions[i + 2];
+    final next3 = filteredPositions[i + 3];
+    final prev3Weight = (15 - prev3.accuracy) / (105 - prev3.accuracy + prev2.accuracy + prev.accuracy + curr.accuracy + next.accuracy + next2.accuracy + next3.accuracy);
+    final prev2Weight = (15 - prev2.accuracy) / (105 - prev3.accuracy + prev2.accuracy + prev.accuracy + curr.accuracy + next.accuracy + next2.accuracy + next3.accuracy);
+    final prevWeight = (15 - prev.accuracy) / (105 - prev3.accuracy + prev2.accuracy + prev.accuracy + curr.accuracy + next.accuracy + next2.accuracy + next3.accuracy);
+    final currWeight = (15 - curr.accuracy) / (105 - prev3.accuracy + prev2.accuracy + prev.accuracy + curr.accuracy + next.accuracy + next2.accuracy + next3.accuracy);
+    final nextWeight = (15 - next.accuracy) / (105 - prev3.accuracy + prev2.accuracy + prev.accuracy + curr.accuracy + next.accuracy + next2.accuracy + next3.accuracy);
+    final next2Weight = (15 - next2.accuracy) / (105 - prev3.accuracy + prev2.accuracy + prev.accuracy + curr.accuracy + next.accuracy + next2.accuracy + next3.accuracy);
+    final next3Weight = (15 - next3.accuracy) / (105 - prev3.accuracy + prev2.accuracy + prev.accuracy + curr.accuracy + next.accuracy + next2.accuracy + next3.accuracy);
+    final totalWeight = prev3Weight + prev2Weight + prevWeight + currWeight + nextWeight + next2Weight + next3Weight;
+    final longitude = ((prev3.location.longitude * prev3Weight) + (prev2.location.longitude * prev2Weight) + (prev.location.longitude * prevWeight) + (curr.location.longitude * currWeight) + (next.location.longitude * nextWeight) + (next2.location.longitude * next2Weight) + (next3.location.longitude * next3Weight)) / totalWeight;
+    final latitude = ((prev3.location.latitude * prev3Weight) + (prev2.location.latitude * prev2Weight) + (prev.location.latitude * prevWeight) + (curr.location.latitude * currWeight) + (next.location.latitude * nextWeight) + (next2.location.latitude * next2Weight) + (next3.location.latitude * next3Weight)) / totalWeight;
+    
 
-  for (int i = 0; i < filteredPositions.length - 1; i++) {
-    var p0 = i == 0 ? filteredPositions[i] : filteredPositions[i - 1];
-    var p1 = filteredPositions[i];
-    var p2 = filteredPositions[i + 1];
-    var p3 = (i + 2 < filteredPositions.length) ? filteredPositions[i + 2] : p2;
-
-    double d01 = Geolocator.distanceBetween(p0.location.latitude, p0.location.longitude, p1.location.latitude, p1.location.longitude);
-    double d12 = Geolocator.distanceBetween(p1.location.latitude, p1.location.longitude, p2.location.latitude, p2.location.longitude);
-    double d23 = Geolocator.distanceBetween(p2.location.latitude, p2.location.longitude, p3.location.latitude, p3.location.longitude);
-
-    double t0 = 0.0;
-    double t1 = t0 + (d01 > 0 ? math.pow(d01, alpha) : 1.0);
-    double t2 = t1 + (d12 > 0 ? math.pow(d12, alpha) : 1.0);
-    double t3 = t2 + (d23 > 0 ? math.pow(d23, alpha) : 1.0);
-
-    for (int j = 0; j < segments; j++) {
-      double weight = j / segments;
-
-      double t = t1 + weight * (t2 - t1);
-
-      double a1Lat = (t1 - t) / (t1 - t0) * p0.location.latitude + (t - t0) / (t1 - t0) * p1.location.latitude;
-      double a1Lng = (t1 - t) / (t1 - t0) * p0.location.longitude + (t - t0) / (t1 - t0) * p1.location.longitude;
-      
-      double a2Lat = (t2 - t) / (t2 - t1) * p1.location.latitude + (t - t1) / (t2 - t1) * p2.location.latitude;
-      double a2Lng = (t2 - t) / (t2 - t1) * p1.location.longitude + (t - t1) / (t2 - t1) * p2.location.longitude;
-      
-      double a3Lat = (t3 - t) / (t3 - t2) * p2.location.latitude + (t - t2) / (t3 - t2) * p3.location.latitude;
-      double a3Lng = (t3 - t) / (t3 - t2) * p2.location.longitude + (t - t2) / (t3 - t2) * p3.location.longitude;
-
-      double b1Lat = (t2 - t) / (t2 - t0) * a1Lat + (t - t0) / (t2 - t0) * a2Lat;
-      double b1Lng = (t2 - t) / (t2 - t0) * a1Lng + (t - t0) / (t2 - t0) * a2Lng;
-      
-      double b2Lat = (t3 - t) / (t3 - t1) * a2Lat + (t - t1) / (t3 - t1) * a3Lat;
-      double b2Lng = (t3 - t) / (t3 - t1) * a2Lng + (t - t1) / (t3 - t1) * a3Lng;
-
-      double lat = (t2 - t) / (t2 - t1) * b1Lat + (t - t1) / (t2 - t1) * b2Lat;
-      double lng = (t2 - t) / (t2 - t1) * b1Lng + (t - t1) / (t2 - t1) * b2Lng;
-
-      double mixedSpeed = p1.speed + (p2.speed - p1.speed) * weight;
-      // double mixedSpeed = Geolocator.distanceBetween(p1.location.latitude, p1.location.longitude, p2.location.latitude, p2.location.longitude) / (p2.timestamp.inSeconds - p1.timestamp.inSeconds);
-
-      int p1Ms = p1.timestamp.inMilliseconds;
-      int p2Ms = p2.timestamp.inMilliseconds;
-      int mixedMs = p1Ms + ((p2Ms - p1Ms) * weight).round();
-
-      smoothed.add(LoggedPosition(
-        timestamp: Duration(milliseconds: mixedMs),
-        location: LatLng(lat, lng),
-        accuracy: 0,
-        speed: mixedSpeed,
-      ));
-    }
+    weightedPoints.add(LoggedPosition(
+      timestamp: curr.timestamp,
+      location: LatLng(latitude, longitude),
+      accuracy: curr.accuracy,
+      speed: curr.speed,
+    ));
   }
-  
-  smoothed.add(original.last);
-  return smoothed;
+  weightedPoints.add(filteredPositions.last);
+  return weightedPoints;
 }
 
 double calculateDistanceFromLastPoint(File sessionFile, Position position) {
