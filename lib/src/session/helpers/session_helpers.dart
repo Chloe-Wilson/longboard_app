@@ -132,13 +132,7 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
       );
       if (dist < 5) continue;
     }
-    final timeDeltaSeconds = i > 0 ? original[i].timestamp.inSeconds - original[i - 1].timestamp.inSeconds : 0;
-    final speed = original[i].speed > 1 ? original[i].speed : (filteredPositions.isNotEmpty ? Geolocator.distanceBetween(
-      filteredPositions[filteredPositions.length - 1].location.latitude,
-      filteredPositions[filteredPositions.length - 1].location.longitude,
-      original[i].location.latitude,
-      original[i].location.longitude,
-    ) / timeDeltaSeconds : 0.0);
+
     filteredPositions.add(LoggedPosition(
         timestamp: original[i].timestamp,
         location: original[i].location,
