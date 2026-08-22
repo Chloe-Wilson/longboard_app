@@ -102,15 +102,17 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
             return const Center(child: Text('No GPS points available.'));
           }
 
-          final center = positions.first.location;
           final smoothedPositions = session_helpers.smoothPositions(positions, segments: 2);
+          final smoothedPositionLocations = smoothedPositions.map((p) => p.location).toList();
 
           return FlutterMap(
             mapController: _mapController,
             options: MapOptions(
               backgroundColor: myColorScheme.surface,
-              initialCenter: center,
-              initialZoom: 15.0,
+              initialCameraFit: CameraFit.coordinates(
+                coordinates: smoothedPositionLocations,
+                padding: const EdgeInsets.all(40)
+                ),
               interactionOptions: InteractionOptions(
                 flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
               ),
