@@ -63,6 +63,8 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
     return positions;
   }
 
+  RangeValues _currentRangeValues = const RangeValues(0.0, 1.0);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -105,86 +107,132 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
           final smoothedPositions = session_helpers.smoothPositions(positions, segments: 2);
           final smoothedPositionLocations = smoothedPositions.map((p) => p.location).toList();
 
-          return FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              backgroundColor: myColorScheme.surface,
-              initialCameraFit: CameraFit.coordinates(
-                coordinates: smoothedPositionLocations,
-                padding: const EdgeInsets.all(40)
-                ),
-              interactionOptions: InteractionOptions(
-                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-              ),
-            ),
+          return Stack( 
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                tileBuilder: (context, tileWidget, tile) {
-                  return ColorFiltered(
-                    colorFilter: const ColorFilter.matrix(<double>[
-                      -0.2126, -0.7152, -0.0722, 0, 255,
-                      -0.2126, -0.7152, -0.0722, 0, 255,
-                      -0.2126, -0.7152, -0.0722, 0, 255,
-                      0,       0,       0,       1, 0,
-                    ]),
-                    child: tileWidget,
-                  );
-                },
-                userAgentPackageName: 'com.CambionStudios.carve',
-              ),
-              PolylineLayer(
-                polylines: [
-                  for (var i = 1; i < smoothedPositions.length; i++)
-                    Polyline(
-                      points: [smoothedPositions[i - 1].location, smoothedPositions[i].location],
-                      color: myColorScheme.primary,
-                      strokeWidth: 6.0,
-                      strokeCap: StrokeCap.round,
-                      strokeJoin: StrokeJoin.round,
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  backgroundColor: myColorScheme.surface,
+                  initialCameraFit: CameraFit.coordinates(
+                    coordinates: smoothedPositionLocations,
+                    padding: const EdgeInsets.all(40)
                     ),
+                  interactionOptions: InteractionOptions(
+                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                  ),
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    tileBuilder: (context, tileWidget, tile) {
+                      return ColorFiltered(
+                        colorFilter: const ColorFilter.matrix(<double>[
+                          -0.2126, -0.7152, -0.0722, 0, 255,
+                          -0.2126, -0.7152, -0.0722, 0, 255,
+                          -0.2126, -0.7152, -0.0722, 0, 255,
+                          0,       0,       0,       1, 0,
+                        ]),
+                        child: tileWidget,
+                      );
+                    },
+                    userAgentPackageName: 'com.CambionStudios.carve',
+                  ),
+                  PolylineLayer(
+                    polylines: [
+                      for (var i = 1 + (smoothedPositions.length * _currentRangeValues.start).toInt(); i < (smoothedPositions.length * _currentRangeValues.end).toInt(); i++)
+                        Polyline(
+                          points: [smoothedPositions[i - 1].location, smoothedPositions[i].location],
+                          color: myColorScheme.primary,
+                          strokeWidth: 6.0,
+                          strokeCap: StrokeCap.round,
+                          strokeJoin: StrokeJoin.round,
+                        ),
+                    ],
+                  ),
+                  PolylineLayer(
+                    polylines: [
+                      for (var i = 1 + (smoothedPositions.length * _currentRangeValues.start).toInt(); i < (smoothedPositions.length * _currentRangeValues.end).toInt(); i++)
+                        Polyline(
+                          points: [smoothedPositions[i - 1].location, smoothedPositions[i].location],
+                          gradientColors: [
+                            session_helpers.getSpeedColor(smoothedPositions[i - 1].speed, context.watch<SettingsNotifier>().settings),
+                            session_helpers.getSpeedColor(smoothedPositions[i].speed, context.watch<SettingsNotifier>().settings),
+                          ],
+                          strokeWidth: 4.0,
+                          strokeCap: StrokeCap.round,
+                          strokeJoin: StrokeJoin.round,
+                        ),
+                    ],
+                  ),
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: positions.first.location,
+                        width: 30,
+                        height: 30,
+                        child: const Icon(
+                          Icons.play_arrow,
+                          color: Colors.green,
+                          size: 20,
+                        ),
+                      ),
+                      Marker(
+                        point: positions.last.location,
+                        width: 30,
+                        height: 30,
+                        child: const Icon(
+                          Icons.stop,
+                          color: Colors.red,
+                          size: 20,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-              PolylineLayer(
-                polylines: [
-                  for (var i = 1; i < smoothedPositions.length; i++)
-                    Polyline(
-                      points: [smoothedPositions[i - 1].location, smoothedPositions[i].location],
-                      gradientColors: [
-                        session_helpers.getSpeedColor(smoothedPositions[i - 1].speed, context.watch<SettingsNotifier>().settings),
-                        session_helpers.getSpeedColor(smoothedPositions[i].speed, context.watch<SettingsNotifier>().settings),
+              Positioned(
+                bottom: 20,
+                left: 16,
+                right: 16,
+                child: SafeArea(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: myColorScheme.surface.withAlpha(225),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 8,
+                          offset: Offset(0, 4),
+                        ),
                       ],
-                      strokeWidth: 4.0,
-                      strokeCap: StrokeCap.round,
-                      strokeJoin: StrokeJoin.round,
                     ),
-                ],
-              ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: positions.first.location,
-                    width: 30,
-                    height: 30,
-                    child: const Icon(
-                      Icons.play_arrow,
-                      color: Colors.green,
-                      size: 20,
-                    ),
-                  ),
-                  Marker(
-                    point: positions.last.location,
-                    width: 30,
-                    height: 30,
-                    child: const Icon(
-                      Icons.stop,
-                      color: Colors.red,
-                      size: 20,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        RangeSlider(
+                          values: _currentRangeValues,
+                          min: 0,
+                          max: 1.0,
+                          divisions: smoothedPositions.length > 1 ? smoothedPositions.length - 1 : 1,
+                          labels: RangeLabels(
+                            'Start',
+                            'Finish',
+                          ),
+                          onChanged: (RangeValues values) {
+                            setState(() {
+                              _currentRangeValues = values;
+                            });
+                          },
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ],
+            ]
+            
           );
         },
       ),
