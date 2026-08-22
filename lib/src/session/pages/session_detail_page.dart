@@ -73,9 +73,11 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
             icon: const Icon(Icons.share),
             tooltip: 'Export Session',
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
               final exportedFile = await session_helpers.exportSession(widget.sessionFile);
+              
               if (exportedFile != null) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text('Session exported to ${exportedFile.path}'),
                     duration: const Duration(seconds: 3),
