@@ -68,6 +68,23 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.sessionName),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.share),
+            tooltip: 'Export Session',
+            onPressed: () async {
+              final exportedFile = await session_helpers.exportSession(widget.sessionFile);
+              if (exportedFile != null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Session exported to ${exportedFile.path}'),
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
       ),
       body: FutureBuilder<List<LoggedPosition>>(
         future: _positionsFuture,

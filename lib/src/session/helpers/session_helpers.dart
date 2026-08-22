@@ -4,8 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-// import 'package:bezier/bezier.dart';
-// import 'package:vector_math/vector_math_64.dart' as vector;
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'package:longboard_app/src/session/models/logged_positions.dart';
 
@@ -217,4 +218,14 @@ double calculateDistanceFromLastPoint(File sessionFile, Position position) {
     debugPrint('Error calculating distance from last point: $e');
     return 0.0;
   }
+}
+
+Future<XFile?> exportSession(File sessionFile) async {
+  final xFile = XFile(sessionFile.path);
+  final result = await Share.shareXFiles([xFile], text: 'Exported Session');
+  
+  if (result.status == ShareResultStatus.success) {
+    return xFile;
+  }
+  return null;
 }
