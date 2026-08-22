@@ -9,6 +9,7 @@ import '../../session/helpers/session_helpers.dart' as session_helpers;
 import '../../session/models/logged_positions.dart';
 import '../../home/helpers/color_scheme.dart';
 import '../../home/widgets/settings_provider.dart';
+import '../widgets/vertical_range_slider.dart';
 
 class SessionDetailPage extends StatefulWidget {
   const SessionDetailPage({
@@ -115,7 +116,12 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
                   backgroundColor: myColorScheme.surface,
                   initialCameraFit: CameraFit.coordinates(
                     coordinates: smoothedPositionLocations,
-                    padding: const EdgeInsets.all(40)
+                    padding: const EdgeInsets.only(
+                      left: 40,
+                      top: 40,
+                      right: 40,
+                      bottom: 80,
+                    )
                     ),
                   interactionOptions: InteractionOptions(
                     flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
@@ -191,48 +197,22 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
                 ],
               ),
               Positioned(
-                bottom: 20,
+                bottom: 10,
                 left: 16,
                 right: 16,
                 child: SafeArea(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: myColorScheme.surface.withAlpha(225),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 8,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        RangeSlider(
-                          values: _currentRangeValues,
-                          min: 0,
-                          max: 1.0,
-                          divisions: smoothedPositions.length > 1 ? smoothedPositions.length - 1 : 1,
-                          labels: RangeLabels(
-                            'Start',
-                            'Finish',
-                          ),
-                          onChanged: (RangeValues values) {
-                            setState(() {
-                              _currentRangeValues = values;
-                            });
-                          },
-                        ),
-                      ],
-                    ),
+                  child: VerticalScrubRangeSlider(
+                    totalPoints: smoothedPositions.length,
+                    currentRange: _currentRangeValues,
+                    onChanged: (newRange) {
+                      setState(() {
+                        _currentRangeValues = newRange;
+                      });
+                    },
                   ),
                 ),
-              ),
+              )
             ]
-            
           );
         },
       ),
