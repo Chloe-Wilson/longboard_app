@@ -210,7 +210,7 @@ double calculateDistanceFromLastPoint(File sessionFile, Position position) {
       position.longitude,
     );
 
-    return 5 > distance ? 0.0 : distance;
+    return distance;
   } catch (e) {
     debugPrint('Error calculating distance from last point: $e');
     return 0.0;
