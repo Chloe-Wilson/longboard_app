@@ -199,7 +199,28 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Past Sessions')),
+      appBar: AppBar(
+        title: const Text('Past Sessions'),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.upload),
+            tooltip: 'Upload Session',
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final uploadFile = await session_helpers.uploadSession();
+              
+              if (uploadFile != null) {
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('${uploadFile.path} uploaded'),
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
       body: FutureBuilder<List<_SessionSummary>>(
         future: _sessionsFuture,
         builder: (context, snapshot) {

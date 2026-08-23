@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'package:longboard_app/src/session/models/logged_positions.dart';
 
@@ -221,3 +223,33 @@ Future<XFile?> exportSession(File sessionFile) async {
   return null;
 }
 
+Future<File?> uploadSession() async {
+  try {
+    // Call FilePicker directly (no .platform instance required)
+    PlatformFile? pickedFile = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: ['txt'],
+    );
+
+    if (pickedFile == null || pickedFile.path == null) {
+      // User canceled the picker
+      return null;
+    }
+
+    // Read the source file chosen by the user
+    File sourceFile = File(pickedFile.path!);
+    String content = await sourceFile.readAsString();
+
+    // Get the app's internal documents directory
+    Directory appDocDir = await getApplicationDocumentsDirectory();
+
+    // Save using the original file name
+    String newPath = '${appDocDir.path}/${pickedFile.name}';
+    File newFile = File(newPath);
+
+    return await newFile.writeAsString(content);
+  } catch (e) {
+    debugPrint('Error picking or saving file: $e');
+    return null;
+  }
+}
