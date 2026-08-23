@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
@@ -211,7 +212,65 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
                     },
                   ),
                 ),
-              )
+              ),
+              Positioned(
+                top: 10,
+                right: 16,
+                child: FloatingActionButton(
+                  heroTag: 'info',
+                  onPressed: () async {
+                    final start = (smoothedPositions.length * _currentRangeValues.start).toInt();
+                    final end = (smoothedPositions.length * _currentRangeValues.end).toInt();
+                    double distance = 0;
+                    double topSpeed = 0;
+                    Duration duration = smoothedPositions[end-1].timestamp - smoothedPositions[start].timestamp;
+                    for (var i = 1 + start; i < end; i++) {
+                      topSpeed = topSpeed > smoothedPositions[i].speed ? topSpeed : smoothedPositions[i].speed;
+                      distance += Geolocator.distanceBetween(
+                        smoothedPositions[i-1].location.latitude,
+                        smoothedPositions[i-1].location.longitude,
+                        smoothedPositions[i].location.latitude,
+                        smoothedPositions[i].location.longitude,
+                      );
+                    }
+                    final hours = duration.inHours;
+                    final minutes = duration.inMinutes.remainder(60);
+                    final seconds = duration.inSeconds.remainder(60);
+                    final hoursPart = hours > 0 ? '${hours.toString().padLeft(2, '0')}:' : '';
+                    final minutesPart = '${minutes.toString().padLeft(2, '0')}:';
+                    final secondsPart = seconds.toString().padLeft(2, '0');
+                    final durationText = '$hoursPart$minutesPart$secondsPart';
+                    final distanceText = '${(distance/1000).toStringAsFixed(2)} km';
+                    final topSpeedText = '${(topSpeed*3.6).toStringAsFixed(2)} km/h';
+                    final averageSpeedText = '${(distance/(duration.inSeconds)*3.6).toStringAsFixed(2)} km/h';
+                    showDialog<void>(
+                      context: context, 
+                      builder: (dialogContext) {
+                        return AlertDialog(
+                          title: const Text('Selection Info'),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.0),
+                            side: BorderSide(
+                              color: myColorScheme.primary,
+                              width: 4.0,
+                            ),
+                          ),
+                          content: Text(
+                            '$durationText\n$distanceText\nAvg $averageSpeedText\nMax $topSpeedText',
+                            textAlign: TextAlign.center,
+                            maxLines: 4,
+                          ),
+                        );
+                      }
+                    );
+                  },
+                  backgroundColor: myColorScheme.primary,
+                  foregroundColor: myColorScheme.onPrimary,
+                  tooltip: 'info',
+                  shape: const CircleBorder(),
+                  child: const Icon(Icons.info),
+                ),
+              ),
             ]
           );
         },

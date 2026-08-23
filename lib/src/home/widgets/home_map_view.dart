@@ -131,7 +131,7 @@ class HomeMapView extends StatelessWidget {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12.0),
                             side: BorderSide(
-                              color: Theme.of(context).colorScheme.primary,
+                              color: myColorScheme.primary,
                               width: 4.0,
                             ),
                           ),
