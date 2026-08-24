@@ -122,6 +122,9 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
   if (original.length < 4) return original;
 
   List<LoggedPosition> filteredPositions = [];
+  List<Duration> stopTime = [];
+  int stopped = 0;
+  LoggedPosition stoppedSpot = original.first;
   filteredPositions.add(original.first);
   for (int i = 1; i < original.length - 1; i++) {
     if (original[i].accuracy >= 15) continue;
@@ -129,19 +132,43 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
       final dist = Geolocator.distanceBetween(
         original[i].location.latitude,
         original[i].location.longitude,
-        filteredPositions[filteredPositions.length - 1].location.latitude,
-        filteredPositions[filteredPositions.length - 1].location.longitude,
+        stoppedSpot.location.latitude,
+        stoppedSpot.location.longitude,
       );
-      if (dist < 5) continue;
+      if (dist < 5) {
+        stopped += 1;
+      } else {
+        if (stopped >= 10) {
+          while (filteredPositions.last.location != stoppedSpot.location) {
+            stopTime.add(filteredPositions.last.timestamp);
+            filteredPositions.removeLast();
+          }
+          stopTime.sort();
+        }
+        stopped = 0;
+        stoppedSpot = original[i];
+      }
     }
 
-    filteredPositions.add(LoggedPosition(
-        timestamp: original[i].timestamp,
-        location: original[i].location,
-        accuracy: original[i].accuracy,
-        speed: original[i].speed,
-      )
-    );
+    if (stopTime.isEmpty) {
+      filteredPositions.add(LoggedPosition(
+          timestamp: original[i].timestamp,
+          location: original[i].location,
+          accuracy: original[i].accuracy,
+          speed: original[i].speed,
+        )
+      );
+    } else {
+      stopTime.add(original[i].timestamp);
+      filteredPositions.add(LoggedPosition(
+          timestamp: stopTime.first,
+          location: original[i].location,
+          accuracy: original[i].accuracy,
+          speed: original[i].speed,
+        )
+      );
+      stopTime.removeAt(0);
+    }
   }
   filteredPositions.add(original.last);
 
