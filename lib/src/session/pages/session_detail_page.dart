@@ -30,10 +30,22 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
   final MapController _mapController = MapController();
   late Future<List<LoggedPosition>> _positionsFuture;
 
+  // Option 2: Isolated slider state using ValueNotifier
+  final ValueNotifier<RangeValues> _rangeNotifier = ValueNotifier(const RangeValues(0.0, 1.0));
+
+  // Cached positions stored at the State level, NOT inside the build method
+  List<LoggedPosition>? _cachedSmoothedPositions;
+
   @override
   void initState() {
     super.initState();
     _positionsFuture = _loadPositions();
+  }
+
+  @override
+  void dispose() {
+    _rangeNotifier.dispose();
+    super.dispose();
   }
 
   Future<List<LoggedPosition>> _loadPositions() async {
@@ -65,10 +77,11 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
     return positions;
   }
 
-  RangeValues _currentRangeValues = const RangeValues(0.0, 1.0);
-
   @override
   Widget build(BuildContext context) {
+    // Extract settings ONCE at the top level
+    final settings = context.watch<SettingsNotifier>().settings;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.sessionName),
@@ -106,164 +119,145 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
             return const Center(child: Text('No GPS points available.'));
           }
 
-          final smoothedPositions = session_helpers.smoothPositions(positions, segments: 2);
-          final smoothedPositionLocations = smoothedPositions.map((p) => p.location).toList();
+          // Process & downsample points ONLY ONCE when future completes
+          if (_cachedSmoothedPositions == null) {
+            final rawSmoothed = session_helpers.smoothPositions(positions, segments: 2);
+            _cachedSmoothedPositions = [];
+            for (var i = 0; i < rawSmoothed.length; i += 3) {
+              _cachedSmoothedPositions!.add(rawSmoothed[i]);
+            }
+            if (rawSmoothed.isNotEmpty && _cachedSmoothedPositions!.last != rawSmoothed.last) {
+              _cachedSmoothedPositions!.add(rawSmoothed.last);
+            }
+          }
 
-          return Stack( 
+          final smoothedPositions = _cachedSmoothedPositions!;
+          final totalCount = smoothedPositions.length;
+
+          return Stack(
             children: [
-              FlutterMap(
-                mapController: _mapController,
-                options: MapOptions(
-                  backgroundColor: myColorScheme.surface,
-                  initialCameraFit: CameraFit.coordinates(
-                    coordinates: smoothedPositionLocations,
-                    padding: const EdgeInsets.only(
-                      left: 40,
-                      top: 40,
-                      right: 40,
-                      bottom: 80,
-                    )
+              // RepaintBoundary prevents map canvas repaints during non-map gestures
+              RepaintBoundary(
+                child: FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    backgroundColor: myColorScheme.surface,
+                    initialCameraFit: CameraFit.coordinates(
+                      coordinates: smoothedPositions.map((p) => p.location).toList(),
+                      padding: const EdgeInsets.only(left: 40, top: 40, right: 40, bottom: 80),
                     ),
-                  interactionOptions: InteractionOptions(
-                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                    interactionOptions: const InteractionOptions(
+                      flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                    ),
                   ),
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    tileBuilder: (context, tileWidget, tile) {
-                      return ColorFiltered(
-                        colorFilter: const ColorFilter.matrix(<double>[
-                          -0.2126, -0.7152, -0.0722, 0, 255,
-                          -0.2126, -0.7152, -0.0722, 0, 255,
-                          -0.2126, -0.7152, -0.0722, 0, 255,
-                          0,       0,       0,       1, 0,
-                        ]),
-                        child: tileWidget,
-                      );
-                    },
-                    userAgentPackageName: 'com.CambionStudios.carve',
-                  ),
-                  PolylineLayer(
-                    polylines: [
-                      for (var i = 1 + (smoothedPositions.length * _currentRangeValues.start).toInt(); i < (smoothedPositions.length * _currentRangeValues.end).toInt(); i++)
-                        Polyline(
-                          points: [smoothedPositions[i - 1].location, smoothedPositions[i].location],
-                          color: myColorScheme.primary,
-                          strokeWidth: 6.0,
-                          strokeCap: StrokeCap.round,
-                          strokeJoin: StrokeJoin.round,
-                        ),
-                    ],
-                  ),
-                  PolylineLayer(
-                    polylines: [
-                      for (var i = 1 + (smoothedPositions.length * _currentRangeValues.start).toInt(); i < (smoothedPositions.length * _currentRangeValues.end).toInt(); i++)
-                        Polyline(
-                          points: [smoothedPositions[i - 1].location, smoothedPositions[i].location],
-                          gradientColors: [
-                            session_helpers.getSpeedColor(smoothedPositions[i - 1].speed, context.watch<SettingsNotifier>().settings),
-                            session_helpers.getSpeedColor(smoothedPositions[i].speed, context.watch<SettingsNotifier>().settings),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      tileBuilder: (context, tileWidget, tile) {
+                        return ColorFiltered(
+                          colorFilter: const ColorFilter.matrix(<double>[
+                            -0.2126, -0.7152, -0.0722, 0, 255,
+                            -0.2126, -0.7152, -0.0722, 0, 255,
+                            -0.2126, -0.7152, -0.0722, 0, 255,
+                            0,       0,       0,       1, 0,
+                          ]),
+                          child: tileWidget,
+                        );
+                      },
+                      userAgentPackageName: 'com.CambionStudios.carve',
+                    ),
+                    
+                    // ValueListenableBuilder targets ONLY the polyline updates
+                    ValueListenableBuilder<RangeValues>(
+                      valueListenable: _rangeNotifier,
+                      builder: (context, currentRange, _) {
+                        final startIdx = (totalCount * currentRange.start).toInt().clamp(0, totalCount);
+                        final endIdx = (totalCount * currentRange.end).toInt().clamp(0, totalCount);
+
+                        final activePositions = (endIdx > startIdx)
+                            ? smoothedPositions.sublist(startIdx, endIdx)
+                            : <LoggedPosition>[];
+
+                        final batchedColoredSegments = session_helpers.batchPositionsByColor(activePositions, settings);
+                        final activeLocations = activePositions.map((p) => p.location).toList();
+
+                        return Stack(
+                          children: [
+                            PolylineLayer(
+                              polylines: [
+                                if (activeLocations.length > 1)
+                                  Polyline(
+                                    points: activeLocations,
+                                    color: myColorScheme.primary,
+                                    strokeWidth: 6.0,
+                                    strokeCap: StrokeCap.round,
+                                    strokeJoin: StrokeJoin.round,
+                                  ),
+                              ],
+                            ),
+                            PolylineLayer(
+                              polylines: batchedColoredSegments,
+                            ),
                           ],
-                          strokeWidth: 4.0,
-                          strokeCap: StrokeCap.round,
-                          strokeJoin: StrokeJoin.round,
+                        );
+                      },
+                    ),
+
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: positions.first.location,
+                          width: 30,
+                          height: 30,
+                          child: const Icon(Icons.play_arrow, color: Colors.green, size: 20),
                         ),
-                    ],
-                  ),
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: positions.first.location,
-                        width: 30,
-                        height: 30,
-                        child: const Icon(
-                          Icons.play_arrow,
-                          color: Colors.green,
-                          size: 20,
+                        Marker(
+                          point: positions.last.location,
+                          width: 30,
+                          height: 30,
+                          child: const Icon(Icons.stop, color: Colors.red, size: 20),
                         ),
-                      ),
-                      Marker(
-                        point: positions.last.location,
-                        width: 30,
-                        height: 30,
-                        child: const Icon(
-                          Icons.stop,
-                          color: Colors.red,
-                          size: 20,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
+
+              // Slider listens directly to ValueNotifier without triggering setState
               Positioned(
                 bottom: 10,
                 left: 16,
                 right: 16,
                 child: SafeArea(
-                  child: VerticalScrubRangeSlider(
-                    totalPoints: smoothedPositions.length,
-                    currentRange: _currentRangeValues,
-                    onChanged: (newRange) {
-                      setState(() {
-                        _currentRangeValues = newRange;
-                      });
+                  child: ValueListenableBuilder<RangeValues>(
+                    valueListenable: _rangeNotifier,
+                    builder: (context, currentRange, _) {
+                      return VerticalScrubRangeSlider(
+                        totalPoints: totalCount,
+                        currentRange: currentRange,
+                        onChanged: (newRange) {
+                          _rangeNotifier.value = newRange;
+                        },
+                      );
                     },
                   ),
                 ),
               ),
+
               Positioned(
                 top: 10,
                 right: 16,
                 child: FloatingActionButton(
                   heroTag: 'info',
-                  onPressed: () async {
-                    final start = (smoothedPositions.length * _currentRangeValues.start).toInt();
-                    final end = (smoothedPositions.length * _currentRangeValues.end).toInt();
-                    double distance = 0;
-                    double topSpeed = 0;
-                    Duration duration = smoothedPositions[end-1].timestamp - smoothedPositions[start].timestamp;
-                    for (var i = 1 + start; i < end; i++) {
-                      topSpeed = topSpeed > smoothedPositions[i].speed ? topSpeed : smoothedPositions[i].speed;
-                      distance += Geolocator.distanceBetween(
-                        smoothedPositions[i-1].location.latitude,
-                        smoothedPositions[i-1].location.longitude,
-                        smoothedPositions[i].location.latitude,
-                        smoothedPositions[i].location.longitude,
-                      );
-                    }
-                    final hours = duration.inHours;
-                    final minutes = duration.inMinutes.remainder(60);
-                    final seconds = duration.inSeconds.remainder(60);
-                    final hoursPart = hours > 0 ? '${hours.toString().padLeft(2, '0')}:' : '';
-                    final minutesPart = '${minutes.toString().padLeft(2, '0')}:';
-                    final secondsPart = seconds.toString().padLeft(2, '0');
-                    final durationText = '$hoursPart$minutesPart$secondsPart';
-                    final distanceText = '${(distance/1000).toStringAsFixed(2)} km';
-                    final topSpeedText = '${(topSpeed*3.6).toStringAsFixed(2)} km/h';
-                    final averageSpeedText = '${(distance/(duration.inSeconds)*3.6).toStringAsFixed(2)} km/h';
-                    showDialog<void>(
-                      context: context, 
-                      builder: (dialogContext) {
-                        return AlertDialog(
-                          title: const Text('Selection Info'),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12.0),
-                            side: BorderSide(
-                              color: myColorScheme.primary,
-                              width: 4.0,
-                            ),
-                          ),
-                          content: Text(
-                            '$durationText\n$distanceText\nAvg $averageSpeedText\nMax $topSpeedText',
-                            textAlign: TextAlign.center,
-                            maxLines: 4,
-                          ),
-                        );
-                      }
-                    );
-                  },
+                  onPressed: smoothedPositions.isEmpty
+                      ? null
+                      : () async {
+                          await session_helpers.showSelectionStatsDialog(
+                            context: context,
+                            smoothedPositions: smoothedPositions,
+                            rangeValues: _rangeNotifier.value,
+                          );
+                        },
                   backgroundColor: myColorScheme.primary,
                   foregroundColor: myColorScheme.onPrimary,
                   tooltip: 'info',
@@ -271,7 +265,7 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
                   child: const Icon(Icons.info),
                 ),
               ),
-            ]
+            ],
           );
         },
       ),

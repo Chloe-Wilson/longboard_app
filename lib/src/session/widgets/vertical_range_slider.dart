@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../../home/helpers/color_scheme.dart';
 
 class VerticalScrubRangeSlider extends StatefulWidget {
@@ -59,6 +58,7 @@ class _VerticalScrubRangeSliderState extends State<VerticalScrubRangeSlider> {
 
     _startY = details.globalPosition.dy;
     _sensitivityMultiplier = 1.0;
+    setState(() {}); // Re-render once to update active thumb visual style
   }
 
   void _onPanUpdate(DragUpdateDetails details, BoxConstraints constraints) {
@@ -67,9 +67,8 @@ class _VerticalScrubRangeSliderState extends State<VerticalScrubRangeSlider> {
     final double currentY = details.globalPosition.dy;
     final double trackWidth = constraints.maxWidth;
 
-    setState(() {
-      _sensitivityMultiplier = _calculateSensitivity(currentY);
-    });
+    // Direct assignment - DO NOT call setState here (parent rebuilds widget anyway)
+    _sensitivityMultiplier = _calculateSensitivity(currentY);
 
     final double deltaNormalized = (details.delta.dx / trackWidth) * _sensitivityMultiplier * 3;
 
@@ -96,9 +95,6 @@ class _VerticalScrubRangeSliderState extends State<VerticalScrubRangeSlider> {
 
   @override
   Widget build(BuildContext context) {
-    final int startIdx = (widget.currentRange.start * (widget.totalPoints - 1)).round();
-    final int endIdx = (widget.currentRange.end * (widget.totalPoints - 1)).round();
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: LayoutBuilder(
@@ -167,5 +163,7 @@ class _RangePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _RangePainter oldDelegate) => true;
+  bool shouldRepaint(covariant _RangePainter oldDelegate) {
+    return oldDelegate.range != range || oldDelegate.activeThumb != activeThumb;
+  }
 }

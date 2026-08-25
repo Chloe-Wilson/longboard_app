@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:longboard_app/src/home/helpers/color_scheme.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter_map/flutter_map.dart';
 
 import 'package:longboard_app/src/session/models/logged_positions.dart';
 
@@ -279,4 +281,117 @@ Future<File?> uploadSession() async {
     debugPrint('Error picking or saving file: $e');
     return null;
   }
+}
+
+Future<void> showSelectionStatsDialog({
+  required BuildContext context,
+  required List<LoggedPosition> smoothedPositions,
+  required RangeValues rangeValues,
+}) async {
+  if (smoothedPositions.isEmpty) return;
+
+  final start = (smoothedPositions.length * rangeValues.start).toInt();
+  final end = (smoothedPositions.length * rangeValues.end).toInt();
+
+  if (start >= end || end > smoothedPositions.length) return;
+
+  double distance = 0;
+  double topSpeed = 0;
+  final duration = smoothedPositions[end - 1].timestamp - smoothedPositions[start].timestamp;
+
+  for (var i = 1 + start; i < end; i++) {
+    topSpeed = topSpeed > smoothedPositions[i].speed ? topSpeed : smoothedPositions[i].speed;
+    distance += Geolocator.distanceBetween(
+      smoothedPositions[i - 1].location.latitude,
+      smoothedPositions[i - 1].location.longitude,
+      smoothedPositions[i].location.latitude,
+      smoothedPositions[i].location.longitude,
+    );
+  }
+
+  final hours = duration.inHours;
+  final minutes = duration.inMinutes.remainder(60);
+  final seconds = duration.inSeconds.remainder(60);
+  final hoursPart = hours > 0 ? '${hours.toString().padLeft(2, '0')}:' : '';
+  final minutesPart = '${minutes.toString().padLeft(2, '0')}:';
+  final secondsPart = seconds.toString().padLeft(2, '0');
+  final durationText = '$hoursPart$minutesPart$secondsPart';
+
+  final distanceText = '${(distance / 1000).toStringAsFixed(2)} km';
+  final topSpeedText = '${(topSpeed * 3.6).toStringAsFixed(2)} km/h';
+
+  final averageSpeedText = duration.inSeconds > 0
+      ? '${(distance / duration.inSeconds * 3.6).toStringAsFixed(2)} km/h'
+      : '0.00 km/h';
+
+  if (!context.mounted) return;
+
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Selection Info'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          side: BorderSide(
+            color: myColorScheme.primary,
+            width: 4.0,
+          ),
+        ),
+        content: Text(
+          '$durationText\n$distanceText\nAvg $averageSpeedText\nMax $topSpeedText',
+          textAlign: TextAlign.center,
+          maxLines: 4,
+        ),
+      );
+    },
+  );
+}
+
+List<Polyline> batchPositionsByColor(
+  List<LoggedPosition> positions, 
+   Map<String, dynamic> settings,
+) {
+  if (positions.length < 2) return [];
+
+  final List<Polyline> polylines = [];
+  List<LatLng> currentBatch = [positions.first.location];
+  Color currentColor = getSpeedColor(positions.first.speed, settings);
+
+  for (var i = 1; i < positions.length; i++) {
+    final pointColor = getSpeedColor(positions[i].speed, settings);
+
+    if (pointColor == currentColor) {
+      currentBatch.add(positions[i].location);
+    } else {
+      currentBatch.add(positions[i].location); // Include transition point to connect lines seamlessly
+      polylines.add(
+        Polyline(
+          points: currentBatch,
+          color: currentColor,
+          strokeWidth: 4.0,
+          strokeCap: StrokeCap.round,
+          strokeJoin: StrokeJoin.round,
+        ),
+      );
+      
+      // Start new batch
+      currentBatch = [positions[i].location];
+      currentColor = pointColor;
+    }
+  }
+
+  if (currentBatch.length > 1) {
+    polylines.add(
+      Polyline(
+        points: currentBatch,
+        color: currentColor,
+        strokeWidth: 4.0,
+        strokeCap: StrokeCap.round,
+        strokeJoin: StrokeJoin.round,
+      ),
+    );
+  }
+
+  return polylines;
 }
