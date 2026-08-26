@@ -18,6 +18,10 @@ android {
     compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
+    buildFeatures {
+        resValues = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -52,8 +56,14 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            // Generates com.CambionStudios.carve.debug package ID
+            applicationIdSuffix = ".debug"
+            resValue("string", "app_name", "Carve (Debug)")
+        }
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
+            resValue("string", "app_name", "Carve")
         }
     }
 }
