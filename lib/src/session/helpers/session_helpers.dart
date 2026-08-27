@@ -172,7 +172,25 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
       stopTime.removeAt(0);
     }
   }
-  filteredPositions.add(original.last);
+  if (stopped >= 10) {
+    while (filteredPositions.last.location != stoppedSpot.location) {
+      stopTime.add(filteredPositions.last.timestamp);
+      filteredPositions.removeLast();
+    }
+    stopTime.sort();
+  }
+  if (stopTime.isEmpty) {
+    filteredPositions.add(original.last);
+    }
+  else {
+    filteredPositions.add(LoggedPosition(
+          timestamp: stopTime.first,
+          location: original.last.location,
+          accuracy: original.last.accuracy,
+          speed: original.last.speed,
+        )
+      );
+  }
 
   List<LoggedPosition> weightedPoints = [];
   weightedPoints.add(filteredPositions.first);
@@ -286,20 +304,14 @@ Future<File?> uploadSession() async {
 Future<void> showSelectionStatsDialog({
   required BuildContext context,
   required List<LoggedPosition> smoothedPositions,
-  required RangeValues rangeValues,
 }) async {
   if (smoothedPositions.isEmpty) return;
 
-  final start = (smoothedPositions.length * rangeValues.start).toInt();
-  final end = (smoothedPositions.length * rangeValues.end).toInt();
-
-  if (start >= end || end > smoothedPositions.length) return;
-
   double distance = 0;
   double topSpeed = 0;
-  final duration = smoothedPositions[end - 1].timestamp - smoothedPositions[start].timestamp;
+  final duration = smoothedPositions.last.timestamp - smoothedPositions.first.timestamp;
 
-  for (var i = 1 + start; i < end; i++) {
+  for (var i = 1; i < smoothedPositions.length; i++) {
     topSpeed = topSpeed > smoothedPositions[i].speed ? topSpeed : smoothedPositions[i].speed;
     distance += Geolocator.distanceBetween(
       smoothedPositions[i - 1].location.latitude,

@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
@@ -118,12 +120,29 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
             return const Center(child: Text('No GPS points available.'));
           }
 
-          // Process & downsample points ONLY ONCE when future completes
           if (_cachedSmoothedPositions == null) {
             final rawSmoothed = session_helpers.smoothPositions(positions, segments: 2);
             _cachedSmoothedPositions = [];
-            for (var i = 0; i < rawSmoothed.length; i += 3) {
-              _cachedSmoothedPositions!.add(rawSmoothed[i]);
+            for (var i = 0; i < rawSmoothed.length; ) {
+              final j = i;
+              i++;
+              double maxSpeed = rawSmoothed[j].speed;
+              for ( ; i < rawSmoothed.length; i++) {
+                final dist = Geolocator.distanceBetween(
+                  rawSmoothed[j].location.latitude, 
+                  rawSmoothed[j].location.longitude, 
+                  rawSmoothed[i].location.latitude, 
+                  rawSmoothed[i].location.longitude
+                  );
+                if (dist > 5) break;
+                maxSpeed = max(maxSpeed, rawSmoothed[i].speed);
+              }
+              _cachedSmoothedPositions!.add(LoggedPosition(
+                timestamp: rawSmoothed[j].timestamp, 
+                location: rawSmoothed[j].location, 
+                accuracy: rawSmoothed[j].accuracy, 
+                speed: maxSpeed)
+                );
             }
             if (rawSmoothed.isNotEmpty && _cachedSmoothedPositions!.last != rawSmoothed.last) {
               _cachedSmoothedPositions!.add(rawSmoothed.last);
@@ -251,10 +270,15 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
                   onPressed: smoothedPositions.isEmpty
                       ? null
                       : () async {
+                          final startIdx = (totalCount * _rangeNotifier.value.start).toInt().clamp(0, totalCount);
+                          final endIdx = (totalCount * _rangeNotifier.value.end).toInt().clamp(0, totalCount);
+
+                          final activePositions = (endIdx > startIdx)
+                              ? smoothedPositions.sublist(startIdx, endIdx)
+                              : <LoggedPosition>[];
                           await session_helpers.showSelectionStatsDialog(
                             context: context,
-                            smoothedPositions: smoothedPositions,
-                            rangeValues: _rangeNotifier.value,
+                            smoothedPositions: activePositions,
                           );
                         },
                   backgroundColor: myColorScheme.primary,

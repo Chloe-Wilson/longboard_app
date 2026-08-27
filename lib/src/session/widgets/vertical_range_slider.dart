@@ -30,9 +30,9 @@ class _VerticalScrubRangeSliderState extends State<VerticalScrubRangeSlider> {
     final double verticalDistance = (_startY - currentY).clamp(0.0, 300.0);
     
     if (verticalDistance < 30) return 1.0;
-    if (verticalDistance < 100) return 0.75;
-    if (verticalDistance < 200) return 0.5;
-    return 0.1;
+    if (verticalDistance < 100) return 0.5;
+    if (verticalDistance < 200) return 0.25;
+    return 0.02;
   }
 
   void _onPanStart(DragStartDetails details, BoxConstraints constraints) {
