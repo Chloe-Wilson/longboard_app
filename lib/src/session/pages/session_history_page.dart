@@ -54,11 +54,13 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
         continue;
       }
       if (index == 1 && line.startsWith('# Summary:')) {
-        hasSummary = true;
-        break;
+        if (line.split(',').length == 6) {
+          hasSummary = true;
+          break;
+        }
       }
+      if (line.startsWith("#")) continue;
       final parts = line.split(',');
-      if (parts.length < 3) continue;
       try {
         final timestamp = session_helpers.parseLogDuration(parts[0]);
         final latitude = double.parse(parts[1]);
@@ -66,16 +68,6 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
         final accuracy = double.parse(parts[3]);
         final speed = double.parse(parts[4]);
         if (accuracy >= 15) continue;
-        if (positions.isNotEmpty) {
-          if (Geolocator.distanceBetween(
-                latitude,
-                longitude,
-                positions.last.location.latitude,
-                positions.last.location.longitude,
-              ) < 5) {
-            continue;
-          }
-        }
         positions.add(LoggedPosition(
           timestamp: timestamp,
           location: LatLng(latitude, longitude),
@@ -86,6 +78,8 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
         continue;
       }
     }
+
+    final smoothed = session_helpers.smoothPositions(positions);
 
     var sessionName = file.path.split(Platform.pathSeparator).last;
     if (lines.isNotEmpty && lines.first.trim().startsWith('# SessionName:')) {
@@ -101,43 +95,50 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
         file: file,
         sessionName: sessionName,
         totalDuration: session_helpers.parseLogDuration(summary[0]),
-        distanceMeters: double.parse(summary[1]),
-        averageSpeedKmh: double.parse(summary[2]),
-        maxSpeedKmh: double.parse(summary[3]),
+        activeDuration: session_helpers.parseLogDuration(summary[1]),
+        breakDuration: session_helpers.parseLogDuration(summary[2]),
+        distanceMeters: double.parse(summary[3]),
+        averageSpeedKmh: double.parse(summary[4]),
+        maxSpeedKmh: double.parse(summary[5]),
       );
     } else {
-      final duration = positions.length >= 2
+      final totalDuration = positions.length >= 2
         ? positions.last.timestamp
         : Duration.zero;
-
+      final activeDuration = smoothed.length >= 2
+        ? smoothed.last.timestamp
+        : Duration.zero;
+      final breakDuration = totalDuration - activeDuration;
       double totalDistance = 0.0;
       double maxSpeedMps = 0.0;
 
-      for (var i = 1; i < positions.length; i++) {
-        final timeDeltaSeconds = positions[i].timestamp.inSeconds - positions[i - 1].timestamp.inSeconds;
+      for (var i = 1; i < smoothed.length; i++) {
+        final timeDeltaSeconds = smoothed[i].timestamp.inSeconds - smoothed[i - 1].timestamp.inSeconds;
         if (timeDeltaSeconds <= 0) continue;
         
         final distance = Geolocator.distanceBetween(
-          positions[i - 1].location.latitude,
-          positions[i - 1].location.longitude,
-          positions[i].location.latitude,
-          positions[i].location.longitude,
+          smoothed[i - 1].location.latitude,
+          smoothed[i - 1].location.longitude,
+          smoothed[i].location.latitude,
+          smoothed[i].location.longitude,
         );
         distance > 0 ? totalDistance += distance : null;
-        maxSpeedMps = positions[i].speed > maxSpeedMps ? positions[i].speed : maxSpeedMps;
+        maxSpeedMps = smoothed[i].speed > maxSpeedMps ? smoothed[i].speed : maxSpeedMps;
       }
 
-      final averageSpeedKmh = duration.inSeconds > 0
-          ? (totalDistance / duration.inSeconds) * 3.6
+      final averageSpeedKmh = activeDuration.inSeconds > 0
+          ? (totalDistance / activeDuration.inSeconds) * 3.6
           : 0.0;
       final maxSpeedKmh = maxSpeedMps * 3.6;
 
-      session_helpers.writeSessionHeader(file, sessionName, '$duration,$totalDistance,$averageSpeedKmh,$maxSpeedKmh');
+      session_helpers.writeSessionHeader(file, sessionName, '$totalDuration,$activeDuration,$breakDuration,$totalDistance,$averageSpeedKmh,$maxSpeedKmh');
 
       return _SessionSummary(
         file: file,
         sessionName: sessionName,
-        totalDuration: duration,
+        totalDuration: totalDuration,
+        activeDuration: activeDuration,
+        breakDuration: breakDuration,
         distanceMeters: totalDistance,
         averageSpeedKmh: averageSpeedKmh,
         maxSpeedKmh: maxSpeedKmh,
@@ -210,6 +211,9 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
               final uploadFile = await session_helpers.uploadSession();
               
               if (uploadFile != null) {
+                setState(() {
+                  _sessionsFuture = _loadSessionSummaries();
+                });
                 messenger.showSnackBar(
                   SnackBar(
                     content: Text('${uploadFile.path} uploaded'),
@@ -235,7 +239,7 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
             return const Center(child: Text('No past sessions found.'));
           }
           return ListView.separated(
-            physics: const ClampingScrollPhysics(),
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.all(16.0),
             itemCount: sessions.length,
             separatorBuilder: (_, _) => const SizedBox(height: 12.0),
@@ -244,7 +248,7 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
               final details =
                   '${_formatDuration(summary.totalDuration)} • ${_formatDistance(summary.distanceMeters)}';
               final stats =
-                  'Avg ${_formatSpeed(summary.averageSpeedKmh)}, max ${_formatSpeed(summary.maxSpeedKmh)}';
+                  'Active ${_formatDuration(summary.activeDuration)}\nAvg ${_formatSpeed(summary.averageSpeedKmh)}, max ${_formatSpeed(summary.maxSpeedKmh)}';
               return ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 tileColor: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -287,6 +291,8 @@ class _SessionSummary {
     required this.file,
     required this.sessionName,
     required this.totalDuration,
+    required this.activeDuration,
+    required this.breakDuration,
     required this.distanceMeters,
     required this.averageSpeedKmh,
     required this.maxSpeedKmh,
@@ -295,6 +301,8 @@ class _SessionSummary {
   final File file;
   final String sessionName;
   final Duration totalDuration;
+  final Duration activeDuration;
+  final Duration breakDuration;
   final double distanceMeters;
   final double averageSpeedKmh;
   final double maxSpeedKmh;
