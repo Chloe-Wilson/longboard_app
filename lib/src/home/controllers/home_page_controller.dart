@@ -35,7 +35,10 @@ class HomePageController {
     final sessionFile = sessionController.sessionFile;
     sessionController.stopSession();
 
-    final defaultSessionName = _defaultSessionName();
+    final lines = await sessionFile!.readAsLines();
+    final rawLines = lines.where((line) => line.trim().isNotEmpty).toList();
+    final duration = session_helpers.parseLogDuration(rawLines.last.split(',')[0]);
+    final defaultSessionName = _defaultSessionName(duration);
     final enteredName = await _promptSessionName(context, defaultSessionName);
     if (enteredName == 'Delete') {
       if (sessionFile != null && await sessionFile.exists()) {
@@ -51,8 +54,8 @@ class HomePageController {
     }
   }
 
-  String _defaultSessionName() {
-    final date = DateTime.now();
+  String _defaultSessionName(Duration duration) {
+    final date = DateTime.now().subtract(duration);
     return 'Session ${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}_${date.hour.toString().padLeft(2, '0')}.${date.minute.toString().padLeft(2, '0')}';
   }
 
