@@ -67,12 +67,19 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
         final longitude = double.parse(parts[2]);
         final accuracy = double.parse(parts[3]);
         final speed = double.parse(parts[4]);
+        final speedAccuracy = parts.length == 8 ? double.parse(parts[5]) : 0.0;
+        final altitude = parts.length == 8 ? double.parse(parts[6]) : 0.0;
+        final altitudeAccuracy = parts.length == 8 ? double.parse(parts[7]) : 0.0;
+
         if (accuracy >= 15) continue;
         positions.add(LoggedPosition(
           timestamp: timestamp,
           location: LatLng(latitude, longitude),
           accuracy: accuracy,
           speed: speed,
+          speedAccuracy: speedAccuracy,
+          altitude: altitude,
+          altitudeAccuracy: altitudeAccuracy
         ));
       } catch (_) {
         continue;

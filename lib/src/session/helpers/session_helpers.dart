@@ -31,7 +31,7 @@ Future<void> writeSessionHeader(File file, String sessionName, [String summary =
 }
 
 Future<void> appendLocationToLog(File sessionFile, Position position, Duration sessionDuration, [bool last = false]) async {
-  final logLine = '$sessionDuration,${position.latitude},${position.longitude},${position.accuracy},${position.speed}\n';
+  final logLine = '$sessionDuration,${position.latitude},${position.longitude},${position.accuracy},${position.speed},${position.speedAccuracy},${position.altitude},${position.altitudeAccuracy}\n';
 
   try {
     if (await sessionFile.exists()) {
@@ -158,6 +158,9 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
           location: original[i].location,
           accuracy: original[i].accuracy,
           speed: original[i].speed,
+          speedAccuracy: original[i].speedAccuracy,
+          altitude: original[i].altitude,
+          altitudeAccuracy: original[i].altitudeAccuracy
         )
       );
     } else {
@@ -167,6 +170,9 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
           location: original[i].location,
           accuracy: original[i].accuracy,
           speed: original[i].speed,
+          speedAccuracy: original[i].speedAccuracy,
+          altitude: original[i].altitude,
+          altitudeAccuracy: original[i].altitudeAccuracy
         )
       );
       stopTime.removeAt(0);
@@ -188,6 +194,9 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
           location: original.last.location,
           accuracy: original.last.accuracy,
           speed: original.last.speed,
+          speedAccuracy: original.last.speedAccuracy,
+          altitude: original.last.altitude,
+          altitudeAccuracy: original.last.altitudeAccuracy
         )
       );
   }
@@ -212,13 +221,16 @@ List<LoggedPosition> smoothPositions(List<LoggedPosition> original, {int segment
     final totalWeight = prev3Weight + prev2Weight + prevWeight + currWeight + nextWeight + next2Weight + next3Weight;
     final longitude = ((prev3.location.longitude * prev3Weight) + (prev2.location.longitude * prev2Weight) + (prev.location.longitude * prevWeight) + (curr.location.longitude * currWeight) + (next.location.longitude * nextWeight) + (next2.location.longitude * next2Weight) + (next3.location.longitude * next3Weight)) / totalWeight;
     final latitude = ((prev3.location.latitude * prev3Weight) + (prev2.location.latitude * prev2Weight) + (prev.location.latitude * prevWeight) + (curr.location.latitude * currWeight) + (next.location.latitude * nextWeight) + (next2.location.latitude * next2Weight) + (next3.location.latitude * next3Weight)) / totalWeight;
-    
+    final speed = curr.speedAccuracy > 2 ? weightedPoints.last.speed : curr.speed;
 
     weightedPoints.add(LoggedPosition(
       timestamp: curr.timestamp,
       location: LatLng(latitude, longitude),
       accuracy: curr.accuracy,
-      speed: curr.speed,
+      speed: speed,
+      speedAccuracy: curr.speedAccuracy,
+      altitude: curr.altitude,
+      altitudeAccuracy: curr.altitudeAccuracy
     ));
   }
   weightedPoints.add(filteredPositions.last);

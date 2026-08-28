@@ -58,18 +58,23 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
       if (line.isEmpty) continue;
       if (line.startsWith('#')) continue;
       final parts = line.split(',');
-      if (parts.length < 3) continue;
       try {
         final timestamp = session_helpers.parseLogDuration(parts[0]);
         final latitude = double.parse(parts[1]);
         final longitude = double.parse(parts[2]);
         final accuracy = double.parse(parts[3]);
         final speed = double.parse(parts[4]);
+        final speedAccuracy = parts.length == 8 ? double.parse(parts[5]) : 0.0;
+        final altitude = parts.length == 8 ? double.parse(parts[6]) : 0.0;
+        final altitudeAccuracy = parts.length == 8 ? double.parse(parts[7]) : 0.0;
         positions.add(LoggedPosition(
           timestamp: timestamp,
           location: LatLng(latitude, longitude),
           accuracy: accuracy,
           speed: speed,
+          speedAccuracy: speedAccuracy,
+          altitude: altitude,
+          altitudeAccuracy: altitudeAccuracy
         ));
       } catch (_) {
         continue;
@@ -141,8 +146,11 @@ class _SessionDetailPageState extends State<SessionDetailPage> {
                 timestamp: rawSmoothed[j].timestamp, 
                 location: rawSmoothed[j].location, 
                 accuracy: rawSmoothed[j].accuracy, 
-                speed: maxSpeed)
-                );
+                speed: maxSpeed,
+                speedAccuracy: rawSmoothed[j].speedAccuracy,
+                altitude: rawSmoothed[j].altitude,
+                altitudeAccuracy: rawSmoothed[j].altitudeAccuracy
+                ));
             }
             if (rawSmoothed.isNotEmpty && _cachedSmoothedPositions!.last != rawSmoothed.last) {
               _cachedSmoothedPositions!.add(rawSmoothed.last);
